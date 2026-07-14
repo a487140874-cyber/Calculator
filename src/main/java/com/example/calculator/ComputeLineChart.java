@@ -17,12 +17,16 @@ import java.util.List;
  * {@link ComputeKeyLayerShi} 调用。特征：用 {@code ai} 而非 {@code lastAi}，
  * 用 {@code RR} 而非 {@code Rt}。这是目前线上真正在跑的路径。
  *
- * <p><b>2. 非 shi 系列（未启用，功能待完成）</b>——入口 {@link #initLineChart}，
+ * <p><b>2. 非 shi 系列（图形功能，已被砍掉）</b>——入口 {@link #initLineChart}，
  * 连同 {@link #computeDMax}、{@link #computeSgm}、{@link #computeMx1}、
  * {@link #computeMx2}、{@link #computeLineChart}、{@link #computeMix}、
  * {@link #computeMiy}、{@link #computeInit}。这些是为「岩层受力折线图 / 下沉量 dMax /
- * 应力 sigma」等图形功能准备的，目前<b>没有任何地方调用</b>，且尚未完工
- * （如 {@link #computeSgm} 直接返回 null）。保留以待后续实现，不要以为是死代码删掉。
+ * 应力 sigma」等图形功能写的，<b>该功能后来被砍掉了</b>，因此这批方法目前没有任何
+ * 地方调用，其中 {@link #computeSgm} 也停在未完工状态（直接返回 null）。
+ *
+ * <p><b>这不是死代码，是被搁置的功能，按作者要求保留，勿删。</b>模型里的 M1/M2、
+ * dMax1/dMax2、sigma1/sigma2、dta 等字段都只服务于这批方法。若日后重做图形功能，
+ * 从这里接着写。
  *
  * <p>注：{@link #computeMix}/{@link #computeMiy} 用 matheclipse 符号积分实现，
  * 已被 {@link ComputeKeyLayerShi} 中基于 commons-math3 数值积分的同名方法取代。

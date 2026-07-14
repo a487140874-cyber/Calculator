@@ -166,22 +166,24 @@ public class GeDataModel
     private BigDecimal lastAi;
 
     /**
-     * M1
+     * M1。<b>为已被砍掉的图形功能而算，目前不参与任何计算</b>，仅导出到 Excel。
+     * 由 {@code KeyLayerAnalyzer.computeM12()} 赋值，详见其注释。保留以备图形功能日后重做。
      */
     private BigDecimal M1;
 
     /**
-     * M2
+     * M2。同 {@link #M1}，为已被砍掉的图形功能而算，目前不参与任何计算，仅导出到 Excel。
      */
     private BigDecimal M2;
 
     /**
-     * dMax1
+     * dMax1（下沉量）。<b>属于已被砍掉的图形功能</b>，由 {@code ComputeLineChart.computeDMax()}
+     * 计算，而该方法当前无人调用，故此字段始终为 null。保留以备日后重做。
      */
     private BigDecimal dMax1;
 
     /**
-     * dMax2
+     * dMax2（下沉量）。同 {@link #dMax1}，属已砍掉的图形功能，当前始终为 null。
      */
     private BigDecimal dMax2;
 

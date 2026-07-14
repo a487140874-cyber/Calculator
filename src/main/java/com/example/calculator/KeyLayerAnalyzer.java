@@ -94,33 +94,54 @@ public class KeyLayerAnalyzer {
     }
 
     /**
-     * 计算M1和M2。
+     * 「本层不破断」分支的开关，恒为 false —— 即该分支目前从不执行。
      *
-     * <p><b>⚠ 这里原本有一个「当前层不破断」的分支，但它从未执行过。</b>
+     * <p>原代码此处的条件是 {@code "false".equals(getIsNotCrack())}。而 isNotCrack
+     * 只会被设为 {@code "true"} 或保持 {@code null}，从未被设成 {@code "false"}，
+     * 所以那个条件恒为假。isNotCrack 改用 boolean 后无法再原样写出这个「恒假」条件
+     * （{@code !isNotCrack()} 的语义是反的），故以本常量显式表达，行为与原来完全一致。
      *
-     * <p>原代码的判断条件是 {@code "false".equals(getIsNotCrack())}，而 isNotCrack
-     * 在整个项目里只会被设成 {@code "true"} 或保持 {@code null}——<b>从来没有任何地方
-     * 把它设成 {@code "false"}</b>。因此该条件恒为 false，「不破断」分支是死代码，
-     * 实际每一层走的都是下面「本层破断」的逻辑。
+     * <p>这是当初有意的设计，不是笔误：分支代码予以保留，把开关拨到 true 即可启用。
+     */
+    private static final boolean USE_INTACT_LAYER_BRANCH = false;
+
+    /**
+     * 计算 M1 和 M2。
      *
-     * <p>作者的本意几乎可以肯定是「本层不破断时」（即 {@code !isNotCrack()}），
-     * 但按本意修正会改变所有岩层的 M1/M2，进而改变计算结果。此处如实保留原行为
-     * （恒走破断分支），死分支已删除。原代码见 {@code git show baseline-original}。
-     * 待你确认后再决定是否按本意修复。
+     * <p><b>M1/M2 是为「岩层受力折线图 / 下沉量 dMax / 应力 sigma」等图形功能算的，
+     * 而该图形功能后来被砍掉了。</b>因此它们目前<b>不参与任何计算</b>——关键层判定、
+     * 破断、能量三步都不读取，唯一的活跃去向是导出到 Excel 的 M1、M2 两列。
+     * 其余消费者（{@link ComputeLineChart#computeDMax}、{@link ComputeLineChart#computeSgm}）
+     * 都属于那族尚未启用的图形代码。此逻辑按要求保留，以备图形功能日后重做。
+     *
+     * <p>当前实际走的是下面「本层破断」的分支（见 {@link #USE_INTACT_LAYER_BRANCH}），
+     * 其语义为：M1 = 上方最近关键层的层厚；M2 = 再上一个关键层的层厚 − 上一个关键层的层厚。
+     * 注意 M2 会出现负值（如第 1、8、10 层）——若日后重做图形功能，需先确认这是否是想要的量。
      */
     public GeDataModel computeM12(List<GeDataModel> geDataModels, GeDataModel geDataModel)
     {
-        //本层破断
-        for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
-            if(geDataModels.get(i).isKeyLayer()){
-                geDataModel.setM1(geDataModels.get(i).getH());
-                for(int j = i + 1; j < geDataModels.size(); j++){
-                    if(geDataModels.get(j).isKeyLayer()){
-                        geDataModel.setM2(geDataModels.get(j).getH().subtract(geDataModels.get(i).getH()));
-                        break;
-                    }
+        //当前层不破断
+        if(USE_INTACT_LAYER_BRANCH){
+            geDataModel.setM1(geDataModel.getH());
+            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
+                if(geDataModels.get(i).isKeyLayer()){
+                    geDataModel.setM2(geDataModels.get(i).getH().subtract(geDataModel.getH()));
+                    break;
                 }
-                break;
+            }
+        }else{
+            //本层破断
+            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
+                if(geDataModels.get(i).isKeyLayer()){
+                    geDataModel.setM1(geDataModels.get(i).getH());
+                    for(int j = i + 1; j < geDataModels.size(); j++){
+                        if(geDataModels.get(j).isKeyLayer()){
+                            geDataModel.setM2(geDataModels.get(j).getH().subtract(geDataModels.get(i).getH()));
+                            break;
+                        }
+                    }
+                    break;
+                }
             }
         }
         return geDataModel;
