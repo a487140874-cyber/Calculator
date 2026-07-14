@@ -93,15 +93,6 @@
     </dependency>
 
 
-    <dependency>
-      <groupId>your.group.id</groupId>
-      <artifactId>computeU</artifactId>
-      <version>1.0.0</version>
-      <scope>system</scope>
-      <systemPath>/Users/gcf/Project/MyProject/hxh/Calculator/repor/computeU.jar</systemPath>
-    </dependency>
-
-
   </dependencies>
 
   <repositories>

@@ -1,7 +1,6 @@
 package com.example.calculator;
 
 import geModel.GeDataModel;
-import getData.GetDateFromExcle;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.analysis.integration.SimpsonIntegrator;
@@ -9,9 +8,7 @@ import org.apache.commons.math3.analysis.integration.UnivariateIntegrator;
 import org.apache.commons.math3.analysis.solvers.BrentSolver;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 
@@ -643,48 +640,6 @@ public class ComputeKeyLayerShi {
         return geDataModels;
     }
 
-    /**
-     * 测试方法
-     */
-
-    public static void main(String[] args) {
-        //数据的预处理
-        List<GeDataModel> geDataModels = new ArrayList<>();
-        //读取数据
-        GetDateFromExcle getDateFromExcle = new GetDateFromExcle();
-        geDataModels = getDateFromExcle.getData("/Users/gcf/Desktop/测试用数据.xlsx");
-
-        KeyLayerAnalyzer keyLayerAnalyzer = new KeyLayerAnalyzer();
-        LayerLoadCalculator layerLoadCalculator = new LayerLoadCalculator();
-        ComputeLineChart computeLineChart = new ComputeLineChart();
-
-        //初始化关键测
-        geDataModels =  layerLoadCalculator.findKeyLayers(geDataModels);
-
-        //核心计算（是否垮落）
-
-        geDataModels = keyLayerAnalyzer.compute(geDataModels);
-
-        List<GeDataModel> list = new ArrayList<>();
-
-        // 导出数据到 Excel
-         for(GeDataModel geDataModel : geDataModels){
-            if("true".equals(geDataModel.getIsKeyLayer())){
-                if("true".equals(geDataModel.getIsNotCrack())){
-                    geDataModel.setM1(BigDecimal.valueOf(7.5));
-                    geDataModel.setM2(BigDecimal.valueOf(39.1));
-                    geDataModel = computeLineChart.computeInit(geDataModel);
-                    list.add(geDataModel);
-                }else{
-                    break;
-                }
-            }
-        }
-
-        computeMain(geDataModels);
-
-
-    }
     /**
      * 整体逻辑
      *

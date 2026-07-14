@@ -3,11 +3,9 @@ package ui;
 import com.example.calculator.KeyLayerAnalyzer;
 import com.example.calculator.LayerLoadCalculator;
 import com.example.calculator.EnergyCalculator;
-import com.example.calculator.ComputeLineChart; // Assuming this might be used later
 import geModel.GeDataModel;
-import geModel.GeDataModelExcel; // Your Excel model
+import geModel.GeDataModelExcel;
 import getData.GetDateFromExcle;
-import ui.EnergyController;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
