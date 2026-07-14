@@ -14,6 +14,45 @@ import java.util.List;
 
 public class ComputeKeyLayerShi {
 
+    /**
+     * 推进距离 ax 达到该值时，启用「大推进距离」特殊计算逻辑
+     * （只算第 {@link #SPECIAL_LAYER_A}、{@link #SPECIAL_LAYER_B} 层的能量）。
+     *
+     * <p><b>⚠ 与 {@link KeyLayerAnalyzer} 中的 279 不一致</b>，两处判定的是同一个工况。
+     * 同时，Python 脚本 {@code generate_3d_layers.py} 里也硬编码了 {@code ax >= 280}
+     * 及第 15/18 层的特殊显示逻辑，三处必须保持同步。此处保持原值 280 不动。
+     */
+    static final double SPECIAL_MODE_AX_THRESHOLD = 280;
+
+    /** 大推进距离工况下参与能量计算的两个特殊层号。 */
+    private static final int SPECIAL_LAYER_A = 15;
+    private static final int SPECIAL_LAYER_B = 18;
+
+    /**
+     * <b>⚠ 写死的能量值，并非计算结果。</b>
+     *
+     * <p>大推进距离工况下，第 15/18 层的能量被直接赋成这两个常量，其上方按正常公式
+     * 算出的 layerPower 被算完即弃。这看起来是为某次演示临时改的，会让该工况下的
+     * 能量输出与输入数据完全无关。此处如实保留原行为，待你确认后再决定是否恢复为真实计算。
+     */
+    private static final BigDecimal HARDCODED_POWER_LAYER_15 = BigDecimal.valueOf(64.629741);
+    private static final BigDecimal HARDCODED_POWER_LAYER_18 = BigDecimal.valueOf(42.178526);
+
+    /** 能量公式中，用于把积分结果扩展到岩层影响范围的跨度余量。 */
+    private static final double ENERGY_SPAN_MARGIN = 120;
+
+    /** 卸荷回弹量 shi 的公式系数：shi = Σ(h * 6 / e)。 */
+    private static final double SHI_COEFFICIENT = 6;
+
+    /** 弹性地基梁那一段积分（自由端向外）的积分上限。 */
+    private static final double FOUNDATION_INTEGRAL_UPPER_BOUND = 60.0;
+
+    /** 数值积分允许的最大求值次数。 */
+    private static final int MAX_INTEGRATION_EVALUATIONS = 10000;
+
+    /** BrentSolver 求根的搜索区间与最大迭代次数。 */
+    private static final double SOLVER_SEARCH_BOUND = 10000;
+    private static final int SOLVER_MAX_ITERATIONS = 100;
 
     /**
      *计算Shi
@@ -21,12 +60,12 @@ public class ComputeKeyLayerShi {
 
     public static BigDecimal computeShi(List<GeDataModel> geDataModels, int index) {
 
-        double shi =  geDataModels.get(index).getH().doubleValue() * 6 / geDataModels.get(index).getE().doubleValue();
+        double shi =  geDataModels.get(index).getH().doubleValue() * SHI_COEFFICIENT / geDataModels.get(index).getE().doubleValue();
         for(int i = index + 1; i < geDataModels.size(); i++){
             if("true".equals(geDataModels.get(i).getIsKeyLayer())){
                 break;
             }
-            shi = shi + geDataModels.get(i).getH().doubleValue() * 6 / geDataModels.get(i).getE().doubleValue();
+            shi = shi + geDataModels.get(i).getH().doubleValue() * SHI_COEFFICIENT / geDataModels.get(i).getE().doubleValue();
         }
 
         return new BigDecimal(shi);
@@ -126,12 +165,12 @@ public class ComputeKeyLayerShi {
         BrentSolver solver = new BrentSolver();
 
         // 求解需要提供一个搜索区间 [min, max]
-        double minY = -10000;
-        double maxY = 10000;
+        double minY = -SOLVER_SEARCH_BOUND;
+        double maxY = SOLVER_SEARCH_BOUND;
 
         // 求解，并返回找到的根
         try {
-            double solutionY = solver.solve(100, function, minY, maxY);
+            double solutionY = solver.solve(SOLVER_MAX_ITERATIONS, function, minY, maxY);
             System.out.println("在区间 [" + minY + ", " + maxY + "] 内找到的 y 值为: " + solutionY);
 
             // 验证结果，将求解出的 x 代入原方程，看是否等于 mm
@@ -219,12 +258,12 @@ public class ComputeKeyLayerShi {
         BrentSolver solver = new BrentSolver();
 
         // 求解需要提供一个搜索区间 [min, max]
-        double minX = -10000;
-        double maxX = 10000;
+        double minX = -SOLVER_SEARCH_BOUND;
+        double maxX = SOLVER_SEARCH_BOUND;
 
         // 求解，并返回找到的根
         try {
-            double solutionX = solver.solve(100, function, minX, maxX);
+            double solutionX = solver.solve(SOLVER_MAX_ITERATIONS, function, minX, maxX);
             System.out.println("在区间 [" + minX + ", " + maxX + "] 内找到的 x 值为: " + solutionX);
 
             // 验证结果，将求解出的 x 代入原方程，看是否等于 mm
@@ -282,7 +321,7 @@ public class ComputeKeyLayerShi {
 
         // 创建一个积分器实例。
         UnivariateIntegrator integrator = new SimpsonIntegrator();
-        final int maxEvaluations = 10000; // 积分计算中允许的最大求值次数
+        final int maxEvaluations = MAX_INTEGRATION_EVALUATIONS;
 
         // ==================================================================
         // 步骤 2: 计算第一个表达式的定积分
@@ -302,7 +341,7 @@ public class ComputeKeyLayerShi {
         };
 
         double lowerBound1 = 0.0;
-        double upperBound1 = 60.0;
+        double upperBound1 = FOUNDATION_INTEGRAL_UPPER_BOUND;
 
         try {
             result1 = integrator.integrate(maxEvaluations, function1, lowerBound1, upperBound1);
@@ -379,7 +418,7 @@ public class ComputeKeyLayerShi {
 
         // 创建一个积分器实例。SimpsonIntegrator 对于大多数平滑函数来说效果很好。
         UnivariateIntegrator integrator = new SimpsonIntegrator();
-        final int maxEvaluations = 10000; // 积分计算中允许的最大求值次数
+        final int maxEvaluations = MAX_INTEGRATION_EVALUATIONS;
 
         // ==================================================================
         // 步骤 2: 计算第一个表达式的定积分
@@ -399,7 +438,7 @@ public class ComputeKeyLayerShi {
         };
 
         double lowerBound1 = 0.0;
-        double upperBound1 = 60.0;
+        double upperBound1 = FOUNDATION_INTEGRAL_UPPER_BOUND;
 
         try {
             result1 = integrator.integrate(maxEvaluations, function1, lowerBound1, upperBound1);
@@ -525,7 +564,7 @@ public class ComputeKeyLayerShi {
         // 检查是否需要执行特殊逻辑：当ax >= 280时，只计算第15和第18层的能量
         GeDataModel startLayer = geDataModels.get(startLayerIndex);
         BigDecimal axValue = startLayer.getAx();
-        boolean useSpecialLogic = (axValue != null && axValue.compareTo(BigDecimal.valueOf(280)) >= 0);
+        boolean useSpecialLogic = (axValue != null && axValue.compareTo(BigDecimal.valueOf(SPECIAL_MODE_AX_THRESHOLD)) >= 0);
         
         if (useSpecialLogic) {
             System.out.println("检测到ax >= 280，启用特殊计算逻辑：只计算第15和第18层的能量");
@@ -537,7 +576,7 @@ public class ComputeKeyLayerShi {
 
                 
                 // 只处理第15层和第18层
-                if ((layerNum == 15 || layerNum == 18) && "true".equals(layer.getIsKeyLayer())) {
+                if ((layerNum == SPECIAL_LAYER_A || layerNum == SPECIAL_LAYER_B) && "true".equals(layer.getIsKeyLayer())) {
                     // 使用与起始层相同的计算逻辑，但lowbound2使用当前层的lastAi
                     double layerMix, layerMiy;
 
@@ -554,11 +593,11 @@ public class ComputeKeyLayerShi {
                     
                     double layerBi = layer.getBi().doubleValue();
                     double layerAi = layer.getAi().doubleValue();
-                    BigDecimal layerPower = BigDecimal.valueOf((layerMix * (layerBi + 120) + layerMiy * (layerAi + 120)) / 2);
-                    if(layerNum == 15){
-                        layer.setPower(BigDecimal.valueOf(64.629741));
+                    BigDecimal layerPower = BigDecimal.valueOf((layerMix * (layerBi + ENERGY_SPAN_MARGIN) + layerMiy * (layerAi + ENERGY_SPAN_MARGIN)) / 2);
+                    if(layerNum == SPECIAL_LAYER_A){
+                        layer.setPower(HARDCODED_POWER_LAYER_15);
                     }else{
-                        layer.setPower(BigDecimal.valueOf(42.178526));;
+                        layer.setPower(HARDCODED_POWER_LAYER_18);
                     }
 
                     
@@ -576,7 +615,7 @@ public class ComputeKeyLayerShi {
         
         double startLayerBi = startLayer.getBi().doubleValue();
         double startLayerAi = startLayer.getAi().doubleValue();
-        BigDecimal startLayerPower = BigDecimal.valueOf((startLayerMix * (startLayerBi + 120) + startLayerMiy * (startLayerAi + 120)) / 2);
+        BigDecimal startLayerPower = BigDecimal.valueOf((startLayerMix * (startLayerBi + ENERGY_SPAN_MARGIN) + startLayerMiy * (startLayerAi + ENERGY_SPAN_MARGIN)) / 2);
         startLayer.setPower(startLayerPower);
 
         // 从下一个关键层开始计算
@@ -631,7 +670,7 @@ public class ComputeKeyLayerShi {
             // 计算能量（使用当前层的ai和bi）
             double currentBi = currentLayer.getBi().doubleValue();
             double currentAi = currentLayer.getAi().doubleValue();
-            BigDecimal power = BigDecimal.valueOf((mix * (currentBi + 120) + miy * (currentAi + 120)) / 2);
+            BigDecimal power = BigDecimal.valueOf((mix * (currentBi + ENERGY_SPAN_MARGIN) + miy * (currentAi + ENERGY_SPAN_MARGIN)) / 2);
             
             // 设置当前层的能量
             currentLayer.setPower(power);

@@ -16,6 +16,31 @@ import static java.lang.Math.abs;
 public class KeyLayerAnalyzer {
 
     /**
+     * 推进距离 ax 达到该值时，视为「大推进距离」工况，强制把所有岩层的 by 改写为
+     * {@link #FORCED_BY_ON_LARGE_AX}。
+     *
+     * <p><b>⚠ 与 {@link ComputeKeyLayerShi#SPECIAL_MODE_AX_THRESHOLD}（280）不一致。</b>
+     * 两处判定的是同一个「大推进距离」工况，阈值却相差 1，ax ∈ [279, 280) 时两边行为会分叉。
+     * 此处保持原值 279 不动，待确认哪个才是正确阈值。
+     */
+    private static final double LARGE_AX_THRESHOLD = 279;
+
+    /** 大推进距离工况下，强制覆盖所有岩层的 by 值。 */
+    private static final BigDecimal FORCED_BY_ON_LARGE_AX = BigDecimal.valueOf(400);
+
+    /** 破断步距搜索：起始值。 */
+    private static final double FRACTURE_SEARCH_START = 1.0;
+
+    /** 破断步距搜索：步长。 */
+    private static final double FRACTURE_SEARCH_STEP = 0.1;
+
+    /**
+     * 破断步距搜索：命中判据。当 |Mi| 超出极限破断弯矩 M 的量落在 (0, 5] 区间内时，
+     * 认为找到了破断步距。
+     */
+    private static final double MOMENT_MATCH_TOLERANCE = 5;
+
+    /**
      * 初始化变量
      * @param geDataModels
      * @return
@@ -583,9 +608,9 @@ public class KeyLayerAnalyzer {
     public List<GeDataModel> compute(List<GeDataModel> geDataModels){
         LayerLoadCalculator layerLoadCalculator = new LayerLoadCalculator();
         //这里计算关键层
-        if(geDataModels.getFirst().getAx().doubleValue() >= 279){
+        if(geDataModels.getFirst().getAx().doubleValue() >= LARGE_AX_THRESHOLD){
             for(int i = 0; i < geDataModels.size(); i++){
-                geDataModels.get(i).setBy(BigDecimal.valueOf(400));
+                geDataModels.get(i).setBy(FORCED_BY_ON_LARGE_AX);
             }
         }
         //初始化数据
@@ -598,7 +623,7 @@ public class KeyLayerAnalyzer {
                 double Mi;
                 double j = -1;
                 boolean ddd = true;
-                for(double i = 1.0;;){
+                for(double i = FRACTURE_SEARCH_START;;){
                     if(i< geDataModel.getBi().intValue()){
                         geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
                         geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
@@ -608,28 +633,32 @@ public class KeyLayerAnalyzer {
                         break;
                     }
 
-                    if(abs(Mi)- geDataModel.getM().doubleValue() <= 5 && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
+                    if(abs(Mi)- geDataModel.getM().doubleValue() <= MOMENT_MATCH_TOLERANCE && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
                         geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
                         geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
                         j = i;
                         break;
                     }
-                    i = i+ 0.1;
+                    i = i+ FRACTURE_SEARCH_STEP;
                 }
 
                 if(!ddd){
-                    for(double i = 1.0;;){
+                    // ⚠ 该循环没有上界：只有命中判据才 break。若给定数据下 |Mi| - M 始终
+                    // 落不进 (0, MOMENT_MATCH_TOLERANCE] 区间，就会无限循环下去（上面
+                    // computeMain1 的循环至少还有 i < bi 兜底）。属已知隐患，此处保持
+                    // 原行为不动，待确认应有的上界后再修。
+                    for(double i = FRACTURE_SEARCH_START;;){
                         geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
                         geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
                         Mi = computeMain2(BigDecimal.valueOf(i), geDataModel.getBi(), geDataModel.getBd(), geDataModel.getQx(), geDataModel.getQy()).doubleValue();
 
-                        if(abs(Mi)- geDataModel.getM().doubleValue() <= 5 && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
+                        if(abs(Mi)- geDataModel.getM().doubleValue() <= MOMENT_MATCH_TOLERANCE && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
                             geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
                             geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
                             j = i;
                             break;
                         }
-                        i = i+ 0.1;
+                        i = i+ FRACTURE_SEARCH_STEP;
                     }
 
                     u = computeU2(geDataModel,BigDecimal.valueOf(j)).doubleValue();
