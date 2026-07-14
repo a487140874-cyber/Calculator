@@ -119,13 +119,18 @@ def generate_3d_visualization(data, output_path):
         by_value = data['by']
         
         # ========== 特殊处理模式判断 ==========
-        # 当ax >= 280时启用特殊显示逻辑
+        # 当ax >= 279时启用特殊显示逻辑
         # 特殊处理包括：
         # 1. 第15层绿色能量立方体改为红色
         # 2. 第18层不显示绿色能量立方体
         # 3. 汇聚线终止于第15层下平面而不是最后一个有能量的层
         # 注意：删除此段代码可恢复原始逻辑
-        is_special_mode = ax_value >= 280
+        #
+        # 此阈值必须与 Java 侧保持一致（KeyLayerAnalyzer.LARGE_AX_THRESHOLD 与
+        # ComputeKeyLayerShi.SPECIAL_MODE_AX_THRESHOLD），三处判定的是同一个工况。
+        # 原为 280，与 Java 侧的 279 不一致，现统一为 279。
+        SPECIAL_MODE_AX_THRESHOLD = 279
+        is_special_mode = ax_value >= SPECIAL_MODE_AX_THRESHOLD
         special_layer_15_bottom_z = None  # 用于存储第15层的下平面Z坐标
         # ========== 特殊处理模式判断结束 ==========
         

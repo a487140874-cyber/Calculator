@@ -18,11 +18,15 @@ public class ComputeKeyLayerShi {
      * 推进距离 ax 达到该值时，启用「大推进距离」特殊计算逻辑
      * （只算第 {@link #SPECIAL_LAYER_A}、{@link #SPECIAL_LAYER_B} 层的能量）。
      *
-     * <p><b>⚠ 与 {@link KeyLayerAnalyzer} 中的 279 不一致</b>，两处判定的是同一个工况。
-     * 同时，Python 脚本 {@code generate_3d_layers.py} 里也硬编码了 {@code ax >= 280}
-     * 及第 15/18 层的特殊显示逻辑，三处必须保持同步。此处保持原值 280 不动。
+     * <p>此阈值必须与 {@code KeyLayerAnalyzer.LARGE_AX_THRESHOLD}、以及 Python 脚本
+     * {@code generate_3d_layers.py} 中的判定保持一致——三处判定的是同一个工况。
+     *
+     * <p>原为 280，而 KeyLayerAnalyzer 处为 279，导致 ax=279 时行为分叉：by 被改写为 400，
+     * 但特殊能量模式不启用，能量会算到第 20 层而非第 15/18 层。现统一为 279。
+     * 之所以往 279 统一而非 280：ax≥279 时 by 被改写为 400，恰好使搜索总在有上界的
+     * 循环中命中；若把此处的阈值抬到 280，ax=279 将失去这层保护。
      */
-    static final double SPECIAL_MODE_AX_THRESHOLD = 280;
+    static final double SPECIAL_MODE_AX_THRESHOLD = 279;
 
     /** 大推进距离工况下参与能量计算的两个特殊层号。 */
     private static final int SPECIAL_LAYER_A = 15;

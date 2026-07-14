@@ -48,15 +48,19 @@ class PipelineGoldenTest {
      * 两份数据分别覆盖两条互斥的代码路径：
      * <ul>
      *   <li>{@code 测试用数据.xlsx}（ax=220）：正常路径</li>
-     *   <li>{@code 测试用数据-大推进距离.xlsx}（ax=300）：触发 ax≥280 的特殊逻辑
-     *       （只算第 15/18 层能量），同时也越过 KeyLayerAnalyzer 的 279 阈值（by 被强制改写为 400）。
-     *       由真实数据改 ax 一列而来。</li>
+     *   <li>{@code 测试用数据-大推进距离.xlsx}（ax=300）：触发 ax≥279 的特殊逻辑
+     *       （by 强制改写为 400，只算第 15/18 层能量）。由真实数据改 ax 一列而来。</li>
+     *   <li>{@code 测试用数据-死循环回归.xlsx}（ax=278）：<b>加上界之前，这份数据会让程序永久挂死</b>——
+     *       第 20 层的 |Mi| 永远达不到极限破断弯矩 M，而搜索循环当时没有上界。
+     *       ax=278 落在 by 不被改写（&lt;279）的区间，正好踩中。此用例确保它不会再挂，
+     *       并锁住「搜到上界仍未命中 → 判为不破断」的处理结果。由真实数据改 ax 一列而来。</li>
      * </ul>
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
             "测试用数据.xlsx,            pipeline-snapshot.txt",
-            "测试用数据-大推进距离.xlsx,   pipeline-snapshot-large-ax.txt"
+            "测试用数据-大推进距离.xlsx,   pipeline-snapshot-large-ax.txt",
+            "测试用数据-死循环回归.xlsx,   pipeline-snapshot-infinite-loop-regression.txt"
     })
     @Timeout(value = 5, unit = TimeUnit.MINUTES) // compute() 内的搜索循环无上界，加超时兜底
     void 完整计算链路的输出应与黄金基线一致(String inputName, String goldenName) throws IOException {

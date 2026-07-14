@@ -19,9 +19,9 @@ public class KeyLayerAnalyzer {
      * 推进距离 ax 达到该值时，视为「大推进距离」工况，强制把所有岩层的 by 改写为
      * {@link #FORCED_BY_ON_LARGE_AX}。
      *
-     * <p><b>⚠ 与 {@link ComputeKeyLayerShi#SPECIAL_MODE_AX_THRESHOLD}（280）不一致。</b>
-     * 两处判定的是同一个「大推进距离」工况，阈值却相差 1，ax ∈ [279, 280) 时两边行为会分叉。
-     * 此处保持原值 279 不动，待确认哪个才是正确阈值。
+     * <p>此阈值必须与 {@link ComputeKeyLayerShi#SPECIAL_MODE_AX_THRESHOLD}、以及
+     * Python 脚本 {@code generate_3d_layers.py} 中的判定保持一致——三处判定的是
+     * 同一个工况。（原先此处为 279、另两处为 280，ax=279 时行为分叉，现已统一为 279。）
      */
     private static final double LARGE_AX_THRESHOLD = 279;
 
@@ -33,6 +33,15 @@ public class KeyLayerAnalyzer {
 
     /** 破断步距搜索：步长。 */
     private static final double FRACTURE_SEARCH_STEP = 0.1;
+
+    /**
+     * 破断步距搜索：上界（安全兜底）。
+     *
+     * <p>取值远大于任何有物理意义的破断步距（单位：米），因此不会截断正常的搜索——
+     * 实测数据中收敛点都在 150 以内。它只用来防止搜索在「|Mi| 永远达不到 M」的岩层上
+     * 无限循环下去。搜到上界仍未命中，即判定该层不破断。
+     */
+    private static final double FRACTURE_SEARCH_MAX = 10000;
 
     /**
      * 破断步距搜索：命中判据。当 |Mi| 超出极限破断弯矩 M 的量落在 (0, 5] 区间内时，
@@ -665,11 +674,12 @@ public class KeyLayerAnalyzer {
                 }
 
                 if(!ddd){
-                    // ⚠ 该循环没有上界：只有命中判据才 break。若给定数据下 |Mi| - M 始终
-                    // 落不进 (0, MOMENT_MATCH_TOLERANCE] 区间，就会无限循环下去（上面
-                    // computeMain1 的循环至少还有 i < bi 兜底）。属已知隐患，此处保持
-                    // 原行为不动，待确认应有的上界后再修。
-                    for(double i = FRACTURE_SEARCH_START;;){
+                    // 搜索破断步距：i 从 1 起步，步长 0.1，直到 |Mi| 刚好超过极限破断弯矩 M。
+                    // 原代码此处没有上界，只有命中才退出。但命中判据要求 |Mi| - M 为正，
+                    // 而对某些岩层 |Mi| 永远够不到 M（实测：一份 ax=278 的数据，第 20 层的
+                    // |Mi| - M 从 i=1 到 i=100000 始终为负，从 -371 只爬到 -249）——
+                    // 退出条件根本不存在，程序就此挂死。故加上界兜底。
+                    for(double i = FRACTURE_SEARCH_START; i < FRACTURE_SEARCH_MAX; i = i + FRACTURE_SEARCH_STEP){
                         geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
                         geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
                         Mi = computeMain2(BigDecimal.valueOf(i), geDataModel.getBi(), geDataModel.getBd(), geDataModel.getQx(), geDataModel.getQy()).doubleValue();
@@ -680,7 +690,15 @@ public class KeyLayerAnalyzer {
                             j = i;
                             break;
                         }
-                        i = i+ FRACTURE_SEARCH_STEP;
+                    }
+
+                    // 搜到上界仍未命中：该层的弯矩始终达不到极限破断弯矩，即本层不会破断。
+                    // 这与下面「j > ai」的处理是同一个结论，故同样判为不破断并结束。
+                    if(j < 0){
+                        System.out.println("第" + geDataModel.getNum() + "层：搜索至上界 "
+                                + FRACTURE_SEARCH_MAX + " 仍未达到极限破断弯矩，判定为不破断。");
+                        geDataModel.setNotCrack(true);
+                        return geDataModels;
                     }
 
                     u = computeU2(geDataModel,BigDecimal.valueOf(j)).doubleValue();
