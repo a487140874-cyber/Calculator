@@ -7,9 +7,32 @@ import org.matheclipse.core.interfaces.IExpr;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-//完成一些计算变量的初始化工作
 
+/**
+ * 完成一些计算变量的初始化工作（Mxz/Mx0/Qx0/Myz/My0/Qy0/Rt/RR 等）。
+ *
+ * <p><b>当前类中并存两套方法，用途不同，勿混用：</b>
+ *
+ * <p><b>1. shi 系列（已启用）</b>——入口 {@link #shiInitLineChart}，被能量计算
+ * {@link ComputeKeyLayerShi} 调用。特征：用 {@code ai} 而非 {@code lastAi}，
+ * 用 {@code RR} 而非 {@code Rt}。这是目前线上真正在跑的路径。
+ *
+ * <p><b>2. 非 shi 系列（未启用，功能待完成）</b>——入口 {@link #initLineChart}，
+ * 连同 {@link #computeDMax}、{@link #computeSgm}、{@link #computeMx1}、
+ * {@link #computeMx2}、{@link #computeLineChart}、{@link #computeMix}、
+ * {@link #computeMiy}、{@link #computeInit}。这些是为「岩层受力折线图 / 下沉量 dMax /
+ * 应力 sigma」等图形功能准备的，目前<b>没有任何地方调用</b>，且尚未完工
+ * （如 {@link #computeSgm} 直接返回 null）。保留以待后续实现，不要以为是死代码删掉。
+ *
+ * <p>注：{@link #computeMix}/{@link #computeMiy} 用 matheclipse 符号积分实现，
+ * 已被 {@link ComputeKeyLayerShi} 中基于 commons-math3 数值积分的同名方法取代。
+ * matheclipse + hipparchus 这两个重依赖目前仅为它们而存在。
+ */
 public class ComputeLineChart {
+
+    /**
+     * 【未启用】非 shi 系列的初始化入口，见类注释。待图形功能完成后接入。
+     */
     public GeDataModel initLineChart(GeDataModel geDataModel)
     {
         geDataModel.setRt(computeRt(geDataModel));
@@ -448,6 +471,9 @@ public class ComputeLineChart {
 
     }
 
+    /**
+     * 【未完成】计算 sigma。两个定积分已算出，但结果未组合、直接返回 null——需要补完。
+     */
     public BigDecimal computeSgm(GeDataModel geDataModel, String type){
         EvalEngine engine = EvalEngine.get();
 
