@@ -118,6 +118,21 @@
           <target>21</target>
         </configuration>
       </plugin>
+      <!-- 运行 JUnit 5 测试（黄金基线测试） -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <!--
+            项目在 D: 盘而系统临时目录在 C: 盘时，surefire 默认的 Boot Manifest-JAR
+            方式会因跨盘符无法计算相对路径而导致 fork 的 JVM 启动即崩溃
+            （报错：'other' has different root）。关闭系统类加载器可绕开该启动 jar。
+          -->
+          <useSystemClassLoader>false</useSystemClassLoader>
+        </configuration>
+      </plugin>
+
       <plugin>
         <groupId>org.openjfx</groupId>
         <artifactId>javafx-maven-plugin</artifactId>
