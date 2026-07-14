@@ -556,7 +556,7 @@ energyComputeMainReturnedNull=false
   lastAi=68.800000
   shi=0.038568
   uix=1.373471
-  power=64.629741
+  power=1066.747471
 
 [layer 16] 砂质泥岩
   h=11.400000
@@ -667,7 +667,7 @@ energyComputeMainReturnedNull=false
   lastAi=63.500000
   shi=0.024959
   uix=1.081531
-  power=42.178526
+  power=590.063590
 
 [layer 19] 砂质泥岩
   h=14.600000

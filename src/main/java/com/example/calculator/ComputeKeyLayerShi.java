@@ -28,16 +28,6 @@ public class ComputeKeyLayerShi {
     private static final int SPECIAL_LAYER_A = 15;
     private static final int SPECIAL_LAYER_B = 18;
 
-    /**
-     * <b>⚠ 写死的能量值，并非计算结果。</b>
-     *
-     * <p>大推进距离工况下，第 15/18 层的能量被直接赋成这两个常量，其上方按正常公式
-     * 算出的 layerPower 被算完即弃。这看起来是为某次演示临时改的，会让该工况下的
-     * 能量输出与输入数据完全无关。此处如实保留原行为，待你确认后再决定是否恢复为真实计算。
-     */
-    private static final BigDecimal HARDCODED_POWER_LAYER_15 = BigDecimal.valueOf(64.629741);
-    private static final BigDecimal HARDCODED_POWER_LAYER_18 = BigDecimal.valueOf(42.178526);
-
     /** 能量公式中，用于把积分结果扩展到岩层影响范围的跨度余量。 */
     private static final double ENERGY_SPAN_MARGIN = 120;
 
@@ -594,13 +584,8 @@ public class ComputeKeyLayerShi {
                     double layerBi = layer.getBi().doubleValue();
                     double layerAi = layer.getAi().doubleValue();
                     BigDecimal layerPower = BigDecimal.valueOf((layerMix * (layerBi + ENERGY_SPAN_MARGIN) + layerMiy * (layerAi + ENERGY_SPAN_MARGIN)) / 2);
-                    if(layerNum == SPECIAL_LAYER_A){
-                        layer.setPower(HARDCODED_POWER_LAYER_15);
-                    }else{
-                        layer.setPower(HARDCODED_POWER_LAYER_18);
-                    }
+                    layer.setPower(layerPower);
 
-                    
                     System.out.println("特殊逻辑计算完成 - 第" + layerNum + "层能量: " + layerPower);
                 }
             }
