@@ -3,8 +3,9 @@ package com.example.calculator;
 import geModel.GeDataModel;
 import getData.GetDateFromExcle;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -40,15 +41,28 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 class PipelineGoldenTest {
 
-    private static final Path INPUT = Paths.get("src/test/resources/测试用数据.xlsx");
-    private static final Path GOLDEN = Paths.get("src/test/resources/golden/pipeline-snapshot.txt");
-
     /** 快照中数值的保留位数：足以捕捉真实的计算变化，又能容忍浮点末位噪音。 */
     private static final int SCALE = 6;
 
-    @Test
-    @Timeout(value = 5, unit = TimeUnit.MINUTES) // KeyLayerAnalyzer.compute() 内有无终止条件的循环，加超时兜底
-    void 完整计算链路的输出应与黄金基线一致() throws IOException {
+    /**
+     * 两份数据分别覆盖两条互斥的代码路径：
+     * <ul>
+     *   <li>{@code 测试用数据.xlsx}（ax=220）：正常路径</li>
+     *   <li>{@code 测试用数据-大推进距离.xlsx}（ax=300）：触发 ax≥280 的特殊逻辑
+     *       （只算第 15/18 层能量），同时也越过 KeyLayerAnalyzer 的 279 阈值（by 被强制改写为 400）。
+     *       由真实数据改 ax 一列而来。</li>
+     * </ul>
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "测试用数据.xlsx,            pipeline-snapshot.txt",
+            "测试用数据-大推进距离.xlsx,   pipeline-snapshot-large-ax.txt"
+    })
+    @Timeout(value = 5, unit = TimeUnit.MINUTES) // compute() 内的搜索循环无上界，加超时兜底
+    void 完整计算链路的输出应与黄金基线一致(String inputName, String goldenName) throws IOException {
+        Path INPUT = Paths.get("src/test/resources").resolve(inputName.trim());
+        Path GOLDEN = Paths.get("src/test/resources/golden").resolve(goldenName.trim());
+
         Assumptions.assumeTrue(Files.exists(INPUT),
                 "缺少输入数据 " + INPUT + "，跳过基线测试。请放入岩层数据后重新运行。");
 
