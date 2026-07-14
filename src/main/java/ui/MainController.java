@@ -5,6 +5,7 @@ import com.example.calculator.LayerLoadCalculator;
 import com.example.calculator.EnergyCalculator;
 import geModel.GeDataModel;
 import geModel.GeDataModelExcel;
+import geModel.GeDataModelMapper;
 import getData.GetDateFromExcle;
 
 import javafx.collections.FXCollections;
@@ -232,7 +233,7 @@ public class MainController {
             statusLabel.setText("Exporting data to " + file.getName() + "...");
             try {
                 // Convert GeDataModel to GeDataModelExcel for export
-                List<GeDataModelExcel> exportList = copyToDto(geDataModels);
+                List<GeDataModelExcel> exportList = GeDataModelMapper.toExcelList(geDataModels);
 
                 try (ExcelWriter excelWriter = EasyExcel.write(file, GeDataModelExcel.class).build()) {
                     WriteSheet writeSheet = EasyExcel.writerSheet("Processed Data").build();
@@ -287,34 +288,6 @@ public class MainController {
             currentY += layerHeight;
         }
         visualizationPane.setPrefHeight(currentY);
-    }
-
-    // Utility method to copy data for export, from your 'test.java'
-    private List<GeDataModelExcel> copyToDto(List<GeDataModel> sourceList) {
-        List<GeDataModelExcel> targetList = new ArrayList<>();
-        for (GeDataModel source : sourceList) {
-            GeDataModelExcel target = new GeDataModelExcel();
-            // This is a simplified, more robust way to copy properties
-            // Assumes GeDataModelExcel has all the relevant fields with the same names
-            try {
-                for (Field sourceField : GeDataModel.class.getDeclaredFields()) {
-                    sourceField.setAccessible(true);
-                    try {
-                        Field targetField = GeDataModelExcel.class.getDeclaredField(sourceField.getName());
-                        targetField.setAccessible(true);
-                        if (targetField.getType().equals(sourceField.getType())) {
-                            targetField.set(target, sourceField.get(source));
-                        }
-                    } catch (NoSuchFieldException e) {
-                        // Field doesn't exist in target, ignore
-                    }
-                }
-            } catch (IllegalAccessException e) {
-                e.printStackTrace(); // Handle error appropriately
-            }
-            targetList.add(target);
-        }
-        return targetList;
     }
 
     private void showError(String title, String content) {
