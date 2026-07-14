@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.MainController">
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu mnemonicParsing="false" text="File">
+                    <MenuItem mnemonicParsing="false" onAction="#handleImportExcel" text="Import from Excel..." />
+                    <MenuItem mnemonicParsing="false" onAction="#handleExportExcel" text="Export to Excel..." />
+                    <SeparatorMenuItem mnemonicParsing="false" />
+                    <MenuItem mnemonicParsing="false" onAction="#handleExit" text="Exit" />
+                </Menu>
+                <Menu mnemonicParsing="false" text="Help">
+                    <MenuItem mnemonicParsing="false" onAction="#handleAbout" text="About" />
+                </Menu>
+            </MenuBar>
+            <ToolBar>
+                <Button onAction="#handleImportExcel" text="Import Data" />
+                <Button fx:id="calculateKeyLayersButton" onAction="#handleCalculateKeyLayers" text="1. Calculate Key Layers" />
+                <Button fx:id="calculateCollapseButton" onAction="#handleCalculateCollapse" text="2. Calculate Collapse" />
+                <Button fx:id="calculateEnergyButton" onAction="#handleCalculateEnergy" text="3. Calculate Energy" />
+                <Button fx:id="generate3DButton" onAction="#handleGenerate3D" text="4. Generate 3D Image" />
+                <Button fx:id="exportButton" onAction="#handleExportExcel" text="Export Results" />
+            </ToolBar>
+        </VBox>
+    </top>
+    <center>
+        <SplitPane dividerPositions="0.75" BorderPane.alignment="CENTER">
+            <TableView fx:id="dataTable" prefHeight="200.0" prefWidth="200.0">
+                <columns>
+                    <TableColumn fx:id="numCol" prefWidth="50.0" text="Num" />
+                    <TableColumn fx:id="nameCol" prefWidth="120.0" text="Name" />
+                    <TableColumn fx:id="hCol" prefWidth="75.0" text="H (Thickness)" />
+                    <TableColumn fx:id="lCol" prefWidth="75.0" text="L (Volume)" />
+                    <TableColumn fx:id="eCol" prefWidth="100.0" text="E (Elasticity)" />
+                    <TableColumn fx:id="rCol" prefWidth="100.0" text="R (Tensile)" />
+                    <TableColumn fx:id="isKeyLayerCol" prefWidth="100.0" text="Is Key Layer?" />
+                    <TableColumn fx:id="isNotCrackCol" prefWidth="100.0" text="Will Collapse?" />
+                    <TableColumn fx:id="lastAiCol" prefWidth="100.0" text="Fracture Dist." />
+                </columns>
+                <columnResizePolicy>
+                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                </columnResizePolicy>
+            </TableView>
+            <VBox alignment="TOP_CENTER" spacing="10.0" style="-fx-background-color: #ECECEC;">
+                <padding>
+                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
+                </padding>
+                <Label text="Rock Layers Visualization">
+                    <font>
+                        <Font name="System Bold" size="14.0" />
+                    </font>
+                </Label>
+                <ScrollPane fx:id="scrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+                    <content>
+                        <Pane fx:id="visualizationPane" prefHeight="600.0" />
+                    </content>
+                </ScrollPane>
+            </VBox>
+        </SplitPane>
+    </center>
+    <bottom>
+        <Label fx:id="statusLabel" text="Status: Ready. Please import an Excel file to begin." BorderPane.alignment="CENTER_LEFT">
+            <padding>
+                <Insets bottom="5.0" left="10.0" right="5.0" top="5.0" />
+            </padding>
+        </Label>
+    </bottom>
+</BorderPane>

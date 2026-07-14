@@ -1,0 +1,665 @@
+package com.example.calculator;
+
+import geModel.GeDataModel;
+
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.util.List;
+
+import static java.lang.Math.abs;
+
+
+/**
+ * 是否破断核心计算
+ */
+public class KeyLayerAnalyzer {
+
+    /**
+     * 初始化变量
+     * @param geDataModels
+     * @return
+     */
+    public List<GeDataModel> initModel(List<GeDataModel> geDataModels){
+
+//        for(GeDataModel geDataModel : geDataModels){
+//            geDataModel.setL(BigDecimal.valueOf(0.025));
+//        }
+
+        for(GeDataModel geDataModel : geDataModels){
+            //计算i
+            geDataModel.setI(computeI(geDataModel.getB(), geDataModel.getH()));
+            //计算q
+            if("true".equals(geDataModel.getIsKeyLayer())){
+                geDataModel.setQ(computeQ(geDataModels, geDataModel.getNum()));
+            }
+        }
+        //计算极限破断弯矩
+        for(GeDataModel geDataModel : geDataModels){
+//            BigDecimal sumQ = BigDecimal.ZERO;
+//            //当前层不是关键层
+//            if(!"true".equals(model.getIsKeyLayer())){
+//                sumQ = sumQ.add(model.getQ());
+//            }else{
+//                sumQ = sumQ.add(model.getQ());
+//                model.setQs(sumQ);
+//                sumQ = BigDecimal.ZERO;
+//            }
+//            model.setQs(sumQ);
+
+            //计算极限破断弯矩
+            geDataModel.setM(computeMoment(geDataModel.getH(), geDataModel.getB(), geDataModel.getR()));
+            //计算百搭
+            geDataModel.setBd(computeBd(geDataModel.getK(), geDataModel.getE(), geDataModel.getI()));
+            //计算ai
+            geDataModel.setAi(computeAi(geDataModels, geDataModel.getNum()));
+            //计算bi
+            geDataModel.setBi(computeBi(geDataModels, geDataModel.getNum()));
+        }
+
+        //计算qx和qy
+        for(GeDataModel geDataModel : geDataModels){
+            if("true".equals(geDataModel.getIsKeyLayer())){
+                geDataModel.setQx(computeQx(geDataModel));
+                geDataModel.setQy(computeQy(geDataModel));
+            }
+            geDataModel = computeM12(geDataModels, geDataModel);
+        }
+        return geDataModels;
+    }
+
+    /**
+     * 计算M1和M2
+     */
+    public GeDataModel computeM12(List<GeDataModel> geDataModels, GeDataModel geDataModel)
+    {
+        //当前层不破断
+        if("false".equals(geDataModel.getIsNotCrack())){
+            geDataModel.setM1(geDataModel.getH());
+            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
+                if("true".equals(geDataModels.get(i).getIsKeyLayer())){
+                    geDataModel.setM2(geDataModels.get(i).getH().subtract(geDataModel.getH()));
+                    break;
+                }
+            }
+        }else{
+            //本层破断
+            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
+                if("true".equals(geDataModels.get(i).getIsKeyLayer())){
+                    geDataModel.setM1(geDataModels.get(i).getH());
+                    for(int j = i + 1; j < geDataModels.size(); j++){
+                        if("true".equals(geDataModels.get(j).getIsKeyLayer())){
+                            geDataModel.setM2(geDataModels.get(j).getH().subtract(geDataModels.get(i).getH()));
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return geDataModel;
+    }
+
+    /**
+     * 计算q
+     */
+    public BigDecimal computeQ(List<GeDataModel> geDataModels, int index){
+        int next = geDataModels.size() - 1;
+        double q = 0.0;//体积力乘高度，rh和
+        //获得本关键层的下一个关键层是第几层
+        for(int i = index; i< geDataModels.size(); i++){
+            if("true".equals(geDataModels.get(i).getIsKeyLayer())){
+                next = i;
+                break;
+            }
+
+        }
+        for(int i = index - 1;i<next;i++){
+            double l = geDataModels.get(i).getL().doubleValue();
+            double h = geDataModels.get(i).getH().doubleValue();
+            q = q + l*h;
+        }
+        return  BigDecimal.valueOf(q);
+    }
+
+    /**
+     * 计算qx
+     */
+    public BigDecimal computeQx(GeDataModel geDataModel){
+        double q = geDataModel.getQ().doubleValue();
+        double ai = geDataModel.getAi().doubleValue();
+        double bi = geDataModel.getBi().doubleValue();
+        double qx = q*bi*bi*bi*bi/(ai*ai*ai*ai + bi*bi*bi*bi);
+        return BigDecimal.valueOf(q*bi*bi*bi*bi/(ai*ai*ai*ai + bi*bi*bi*bi));
+    }
+
+    /**
+     * 计算qy
+     */
+    public BigDecimal computeQy(GeDataModel geDataModel){
+        double q = geDataModel.getQ().doubleValue();
+        double ai = geDataModel.getAi().doubleValue();
+        double bi = geDataModel.getBi().doubleValue();
+        double qy = q*ai*ai*ai*ai/(ai*ai*ai*ai + bi*bi*bi*bi);
+        return BigDecimal.valueOf(q*ai*ai*ai*ai/(ai*ai*ai*ai + bi*bi*bi*bi));
+    }
+
+
+    public BigDecimal computeQx(GeDataModel geDataModel, BigDecimal aiValue){
+        double q = geDataModel.getQ().doubleValue();
+        double ai = aiValue.doubleValue();
+        double bi = geDataModel.getBi().doubleValue();
+        return BigDecimal.valueOf(q*bi*bi*bi*bi/(ai*ai*ai*ai + bi*bi*bi*bi));
+
+    }
+
+    public BigDecimal computeQy(GeDataModel geDataModel, BigDecimal aiValue){
+        double q = geDataModel.getQ().doubleValue();
+        double ai = aiValue.doubleValue();
+        double bi = geDataModel.getBi().doubleValue();
+        return BigDecimal.valueOf(q*ai*ai*ai*ai/(ai*ai*ai*ai + bi*bi*bi*bi));
+    }
+
+
+    /**
+     * 计算i
+     */
+    public BigDecimal computeI(BigDecimal B,BigDecimal H){
+        double b = B.doubleValue();
+        double h = H.doubleValue();
+        double i = b*h*h*h/12.0;
+        return BigDecimal.valueOf(b*h*h*h/12.0);
+    }
+
+
+
+    /**
+     * 计算极限破断弯矩
+     */
+    public BigDecimal computeMoment(BigDecimal h,BigDecimal b,BigDecimal r){
+        return b.multiply(h).multiply(h).multiply(r).divide(new BigDecimal(6), 10, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 计算百搭
+     */
+    public BigDecimal computeBd(BigDecimal k,BigDecimal e,BigDecimal i){
+        BigDecimal four = BigDecimal.valueOf(4);
+        BigDecimal bd = k.divide(e.multiply(i).multiply(four), 10, RoundingMode.HALF_UP);
+        double fourValue = bd.doubleValue();
+        fourValue = Math.sqrt(fourValue);
+        fourValue = Math.sqrt(fourValue);
+        return BigDecimal.valueOf(fourValue);
+    }
+
+    /**
+     * 计算ai
+     */
+    public BigDecimal computeAi(List<GeDataModel> geDataModels, int index){
+        BigDecimal length = BigDecimal.ZERO;
+        if(index == 1){
+            return geDataModels.get(0).getAx();
+        }
+        for(int i = 0; i< index - 1; i++){
+            double af = geDataModels.get(i).getAf().doubleValue();
+            af = Math.toRadians(af);
+            BigDecimal cotValue = BigDecimal.valueOf(Math.tan(af));
+            cotValue = BigDecimal.ONE.divide(cotValue, 10, RoundingMode.HALF_UP);
+            length = length.add(geDataModels.get(i).getH().multiply(cotValue).multiply(BigDecimal.TWO));
+        }
+        BigDecimal cs =  geDataModels.get(index-1).getAx().subtract(length);
+        return geDataModels.get(index-1).getAx().subtract(length);
+    }
+
+    /**
+     * 计算bi
+     */
+    public BigDecimal computeBi(List<GeDataModel> geDataModels, int index){
+        BigDecimal length = BigDecimal.ZERO;
+        if(index == 1){
+            return geDataModels.get(0).getBy();
+        }
+        for(int i = 0; i< index - 1; i++){
+            double af = geDataModels.get(i).getAf().doubleValue();
+            af = Math.toRadians(af);
+            BigDecimal cotValue = BigDecimal.valueOf(Math.tan(af));
+            cotValue = BigDecimal.ONE.divide(cotValue, 10, RoundingMode.HALF_UP);
+            length = length.add(geDataModels.get(i).getH().multiply(cotValue).multiply(BigDecimal.TWO));
+        }
+        return geDataModels.get(index-1).getBy().subtract(length);
+    }
+
+    /**
+     *a>b 核心公式
+     */
+    public BigDecimal computeMain1(BigDecimal ai, BigDecimal bi, BigDecimal bdValue, BigDecimal qxValue, BigDecimal qyValue) {
+        BigDecimal a = ai;
+        BigDecimal b = bi;
+        BigDecimal bd = bdValue;
+        BigDecimal qx = qxValue;
+        BigDecimal qy = qyValue;
+
+        // Calculate the numerator (fz)
+        BigDecimal term1 = a.multiply(qx)
+                .multiply(BigDecimal.valueOf(-576)
+                        .add(BigDecimal.valueOf(144).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(60).multiply(a.pow(3)).multiply(bd.pow(3)))
+                        .add(BigDecimal.valueOf(12).multiply(a.pow(4)).multiply(bd.pow(4)))
+                        .add(a.pow(5).multiply(bd.pow(5)))
+                        .subtract(BigDecimal.valueOf(24).multiply(b).multiply(bd)
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(a).multiply(bd))
+                                        .add(a.pow(2).multiply(bd.pow(2)))))
+                        .subtract(BigDecimal.valueOf(12).multiply(b.pow(2)).multiply(bd.pow(2))
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(a).multiply(bd))
+                                        .add(a.pow(2).multiply(bd.pow(2)))))
+                        .subtract(BigDecimal.valueOf(2).multiply(b.pow(3)).multiply(bd.pow(3))
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(a).multiply(bd))
+                                        .add(a.pow(2).multiply(bd.pow(2))))));
+
+        BigDecimal term2 = BigDecimal.valueOf(3).multiply(b)
+                .multiply(BigDecimal.valueOf(2).add(a.multiply(bd)).pow(2))
+                .multiply(BigDecimal.valueOf(48)
+                        .add(BigDecimal.valueOf(24).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(8).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(b.pow(3).multiply(bd.pow(3))))
+                .multiply(qy);
+
+        BigDecimal fz = term1.subtract(term2);
+
+        // Calculate the denominator (fm)
+        BigDecimal fm = BigDecimal.valueOf(48).multiply(bd)
+                .multiply(BigDecimal.valueOf(2).add(a.multiply(bd)))
+                .multiply(BigDecimal.valueOf(48)
+                        .add(BigDecimal.valueOf(12).multiply(a).multiply(bd))
+                        .add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(6).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(a.pow(3).multiply(bd.pow(3)))
+                        .add(b.pow(3).multiply(bd.pow(3))));
+
+        // Divide fz by fm and round to 10 decimal places
+        return fz.divide(fm, 10, RoundingMode.HALF_UP);
+    }
+//    public double computeMain1(BigDecimal ai,BigDecimal bi,BigDecimal bdValue,BigDecimal qxValue,BigDecimal qyValue){
+//        double a = ai.doubleValue();
+//        double b = bi.doubleValue();
+//        double bd = bdValue.doubleValue();
+//        double qx = qxValue.doubleValue();
+//        double qy = qyValue.doubleValue();
+//
+//        ///
+//        double fz = (a*qx*((-576 + 144*a*a*bd*bd + 60*a*a*a*bd*bd*bd + 12*a*a*a*a*bd*bd*bd*bd + a*a*a*a*a*bd*bd*bd*bd*bd
+//                -24*b*bd*(12+6*a*bd+a*a*bd*bd) - 12*b*b*bd*bd*(12+6*a*bd+a*a*bd*bd) -
+//                2*b*b*b*bd*bd*bd*(12+6*a*bd+a*a*bd*bd)) ) - (3*b*(2+a*bd)*(2+a*bd)*(48+24*b*bd+8*b*b*bd*bd
+//                + b*b*b*bd*bd*bd))*qy);
+//        double fm = (48*bd*(2+a*bd)*(48+12*a*bd+12*b*bd+6*a*a*bd*bd+6*b*b*bd*bd+a*a*a*bd*bd*bd + b*b*b*bd*bd*bd));
+//
+//        BigDecimal z =  BigDecimal.valueOf(fz);
+//        BigDecimal m =  BigDecimal.valueOf(fm);
+//        return  z.divide(m, 10, RoundingMode.HALF_UP).doubleValue();
+//    }
+
+
+    /**
+     *a<b 核心公式
+     */
+    public BigDecimal computeMain2(BigDecimal ai, BigDecimal bi, BigDecimal bdValue, BigDecimal qxValue, BigDecimal qyValue) {
+        BigDecimal a = ai;
+        BigDecimal b = bi;
+        BigDecimal bd = bdValue;
+        BigDecimal qx = qxValue;
+        BigDecimal qy = qyValue;
+
+        // Calculate the numerator (fz)
+        BigDecimal term1 = a.negate().multiply(BigDecimal.valueOf(3))
+                .multiply(BigDecimal.valueOf(2).add(b.multiply(bd)).pow(2)
+                        .multiply(BigDecimal.valueOf(48)
+                                .add(BigDecimal.valueOf(24).multiply(a).multiply(bd))
+                                .add(BigDecimal.valueOf(8).multiply(a.pow(2)).multiply(bd.pow(2)))
+                                .add(a.pow(3).multiply(bd.pow(3))))
+                        .multiply(qx));
+
+        BigDecimal term2 = b.multiply(qy)
+                .multiply(BigDecimal.valueOf(-576)
+                        .add(BigDecimal.valueOf(144).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(60).multiply(b.pow(3)).multiply(bd.pow(3)))
+                        .add(BigDecimal.valueOf(12).multiply(b.pow(4)).multiply(bd.pow(4)))
+                        .add(b.pow(5).multiply(bd.pow(5)))
+                        .subtract(BigDecimal.valueOf(24).multiply(a).multiply(bd)
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(b).multiply(bd))
+                                        .add(b.pow(2).multiply(bd.pow(2)))))
+                        .subtract(BigDecimal.valueOf(12).multiply(a.pow(2)).multiply(bd.pow(2))
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(b).multiply(bd))
+                                        .add(b.pow(2).multiply(bd.pow(2)))))
+                        .subtract(BigDecimal.valueOf(2).multiply(a.pow(3)).multiply(bd.pow(3))
+                                .multiply(BigDecimal.valueOf(12)
+                                        .add(BigDecimal.valueOf(6).multiply(b).multiply(bd))
+                                        .add(b.pow(2).multiply(bd.pow(2))))));
+
+        BigDecimal fz = term1.add(term2);
+
+        // Calculate the denominator (fm)
+        BigDecimal fm = BigDecimal.valueOf(48).multiply(bd)
+                .multiply(BigDecimal.valueOf(2).add(b.multiply(bd)))
+                .multiply(BigDecimal.valueOf(48)
+                        .add(BigDecimal.valueOf(12).multiply(a).multiply(bd))
+                        .add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(6).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(a.pow(3).multiply(bd.pow(3)))
+                        .add(b.pow(3).multiply(bd.pow(3))));
+
+        // Divide fz by fm and round to 10 decimal places
+        return fz.divide(fm, 10, RoundingMode.HALF_UP);
+    }
+//    public double computeMain2(BigDecimal ai,BigDecimal bi,BigDecimal bdValue,BigDecimal qxValue,BigDecimal qyValue){
+//        double a = ai.doubleValue();
+//        double b = bi.doubleValue();
+//        double bd = bdValue.doubleValue();
+//        double qx = qxValue.doubleValue();
+//        double qy = qyValue.doubleValue();
+//
+//        double fz = (-3*a*(((2+b*bd)*(2+b*bd)*(48+24*a*bd+8*a*a*bd*bd
+//                + a*a*a*bd*bd*bd))*qx) + b*qy*((-576 + 144*b*b*bd*bd + 60*b*b*b*bd*bd*bd + 12*b*b*b*b*bd*bd*bd*bd + b*b*b*b*b*bd*bd*bd*bd*bd
+//                -24*a*bd*(12+6*b*bd+b*b*bd*bd) - 12*a*a*bd*bd*(12+6*b*bd+b*b*bd*bd) -
+//                2*a*a*a*bd*bd*bd*(12+6*b*bd+b*b*bd*bd))));
+//
+//        double fm =  (48*bd*(2+b*bd)*(48+12*a*bd+12*b*bd+6*a*a*bd*bd+6*b*b*bd*bd+a*a*a*bd*bd*bd + b*b*b*bd*bd*bd));
+//        BigDecimal z =  BigDecimal.valueOf(fz);
+//        BigDecimal m =  BigDecimal.valueOf(fm);
+//        return  z.divide(m, 10, RoundingMode.HALF_UP).doubleValue();
+//
+////        return (-3*a*(((2+a*bd)*(2+a*bd)*(48+24*a*bd+8*a*a*bd*bd
+////                + a*a*a*bd*bd*bd))*qx) + b*qy*((-576 + 144*b*b*bd*bd + 60*b*b*b*bd*bd*bd + 12*b*b*b*b*bd*bd*bd*bd + b*b*b*b*b*bd*bd*bd*bd*bd
+////                -24*a*bd*(12+6*b*bd+b*b*bd*bd) - 12*a*a*bd*bd*(12+6*b*bd+b*b*bd*bd) -
+////                2*a*a*a*bd*bd*bd*(12+6*b*bd+b*b*bd*bd)))) / (48*bd*(2+b*bd)*(48+12*a*bd+12*b*bd+6*a*a*bd*bd+6*b*b*bd*bd+a*a*a*bd*bd*bd + b*b*b*bd*bd*bd));
+//    }
+//
+//    //计算u
+////    public double computeU(Model model,BigDecimal aValue){
+////        double a = aValue.doubleValue();
+////        double h = model.getH().doubleValue();
+////        double b = model.getBi().doubleValue();
+////        double e = model.getE().doubleValue();
+////        double i = model.getI().doubleValue();
+////        double r = model.getR().doubleValue();
+////        double bd = model.getBd().doubleValue();
+////        double qx = model.getQx().doubleValue();
+////        double qy = model.getQy().doubleValue();
+////
+//////        double fz = (-(h*h*a*a*r/48)+a*qx*(60*a*a*a*a*a*bd*bd*bd*bd*bd+12*a*a*a*a*a*a*bd*bd*bd*bd*bd*bd
+//////                +a*a*a*a*a*a*a*bd*bd*bd*bd*bd*bd*bd-a*a*a*a*bd*bd*bd*bd*(-168+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)
+//////                -2*a*a*a*bd*bd*bd*(-120+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)+96*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)
+//////                +96*a*bd*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)+16*a*a*bd*bd*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd))
+//////                - 2*b*(48+24*b*bd+8*b*b*bd*bd+b*b*b*bd*bd*bd)*(-24-24*a*bd-6*a*a*bd*bd+2*a*a*a*bd*bd*bd+a*a*a*a*bd*bd*bd*bd)*qy);
+//////        double fm =  (384*bd*bd*bd*(2+a*bd)*(48+12*a*bd+12*b*bd+6*a*a*bd*bd+6*b*b*bd*bd+a*a*a*bd*bd*bd+b*b*b*bd*bd*bd)*e*i);
+////        double fz = (a*qx*(-60*a*a*a*a*a*bd*bd*bd*bd*bd-12*a*a*a*a*a*a*bd*bd*bd*bd*bd*bd
+////                -a*a*a*a*a*a*a*bd*bd*bd*bd*bd*bd*bd+3*a*a*a*a*bd*bd*bd*bd*(-40+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)
+////                +2*a*a*a*bd*bd*bd*(120+132*b*bd+66*b*b*bd*bd+11*b*b*b*bd*bd*bd)+96*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)
+////                +96*a*bd*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd)+64*a*a*bd*bd*(24+12*b*bd+6*b*b*bd*bd+b*b*b*bd*bd*bd))
+////                + 4*b*(48+24*b*bd+8*b*b*bd*bd+b*b*b*bd*bd*bd)*(12+12*b*bd+9*a*a*bd*bd+5*a*a*a*bd*bd*bd+a*a*a*a*bd*bd*bd*bd)*qy);
+////        double fm =  (384*bd*bd*bd*(2+a*bd)*(48+12*a*bd+12*b*bd+6*a*a*bd*bd+6*b*b*bd*bd+a*a*a*bd*bd*bd+b*b*b*bd*bd*bd));
+////
+////        return  (-(h*h*a*a*r/48)+(fz/fm))/e/i*5;
+////     }
+    public BigDecimal computeU(GeDataModel geDataModel, BigDecimal aValue) {
+        // Set the precision for BigDecimal calculations
+        MathContext mc = new MathContext(30);
+
+        // Extract values from the model
+        BigDecimal a = aValue;
+        BigDecimal h = geDataModel.getH();
+        BigDecimal b = geDataModel.getBi();
+        BigDecimal e = geDataModel.getE();
+        BigDecimal i = geDataModel.getI();
+        BigDecimal r = geDataModel.getR();
+        BigDecimal bd = geDataModel.getBd();
+        BigDecimal qx = geDataModel.getQx();
+        BigDecimal qy = geDataModel.getQy();
+
+        // Calculate the numerator (fz)
+        BigDecimal term1 = a.multiply(qx).multiply(
+                BigDecimal.valueOf(-60).multiply(a.pow(5)).multiply(bd.pow(5))
+                        .subtract(BigDecimal.valueOf(12).multiply(a.pow(6)).multiply(bd.pow(6)))
+                        .subtract(a.pow(7).multiply(bd.pow(7)))
+                        .add(BigDecimal.valueOf(3).multiply(a.pow(4)).multiply(bd.pow(4))
+                                .multiply(BigDecimal.valueOf(-40).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                                        .add(b.pow(3).multiply(bd.pow(3)))))
+                        .add(BigDecimal.valueOf(2).multiply(a.pow(3)).multiply(bd.pow(3))
+                                .multiply(BigDecimal.valueOf(120).add(BigDecimal.valueOf(132).multiply(b).multiply(bd))
+                                        .add(BigDecimal.valueOf(66).multiply(b.pow(2)).multiply(bd.pow(2)))
+                                        .add(BigDecimal.valueOf(11).multiply(b.pow(3)).multiply(bd.pow(3)))))
+                        .add(BigDecimal.valueOf(96).multiply(
+                                BigDecimal.valueOf(24).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                                        .add(b.pow(3).multiply(bd.pow(3)))))
+                        .add(BigDecimal.valueOf(96).multiply(a).multiply(bd)
+                                .multiply(BigDecimal.valueOf(24).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                                        .add(b.pow(3).multiply(bd.pow(3)))))
+                        .add(BigDecimal.valueOf(64).multiply(a.pow(2)).multiply(bd.pow(2))
+                                .multiply(BigDecimal.valueOf(24).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                                        .add(b.pow(3).multiply(bd.pow(3))))), mc);
+
+        BigDecimal term2 = BigDecimal.valueOf(4).multiply(b)
+                .multiply(BigDecimal.valueOf(48).add(BigDecimal.valueOf(24).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(8).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(b.pow(3).multiply(bd.pow(3))))
+                .multiply(BigDecimal.valueOf(12).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(9).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(5).multiply(a.pow(3)).multiply(bd.pow(3)))
+                        .add(a.pow(4).multiply(bd.pow(4))))
+                .multiply(qy);
+
+        BigDecimal fz = term1.add(term2, mc);
+
+        // Calculate the denominator (fm)
+        BigDecimal fm = BigDecimal.valueOf(384).multiply(bd.pow(3))
+                .multiply(BigDecimal.valueOf(2).add(a.multiply(bd)), mc)
+                .multiply(BigDecimal.valueOf(48).add(BigDecimal.valueOf(12).multiply(a).multiply(bd))
+                        .add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(6).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(a.pow(3).multiply(bd.pow(3)))
+                        .add(b.pow(3).multiply(bd.pow(3))), mc);
+
+        // Compute the result
+        BigDecimal part1 = h.pow(2).multiply(a.pow(2)).multiply(r).divide(BigDecimal.valueOf(48), mc).negate();
+        BigDecimal result = (part1.add(fz.divide(fm, mc))).divide(e.multiply(i), mc).multiply(BigDecimal.valueOf(5));
+
+        return result;
+    }
+
+    public static BigDecimal computeU2(GeDataModel geDataModel, BigDecimal aValue) {
+
+        BigDecimal a = aValue;
+        BigDecimal h = geDataModel.getH();
+        BigDecimal b = geDataModel.getBi();
+        BigDecimal e = geDataModel.getE();
+        BigDecimal i = geDataModel.getI();
+        BigDecimal r = geDataModel.getR();
+        BigDecimal bd = geDataModel.getBd();
+        BigDecimal qx = geDataModel.getQx();
+        BigDecimal qy = geDataModel.getQy();
+
+        // Set the precision for BigDecimal calculations
+        MathContext mc = new MathContext(30);
+
+        // Calculate the numerator (fz)
+        BigDecimal term1 = BigDecimal.valueOf(4).multiply(a).multiply(qx).multiply(
+                BigDecimal.valueOf(48).add(BigDecimal.valueOf(24).multiply(a).multiply(bd))
+                        .add(BigDecimal.valueOf(8).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(a.pow(3).multiply(bd.pow(3))), mc);
+
+        BigDecimal term2 = BigDecimal.valueOf(12).add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                .add(BigDecimal.valueOf(9).multiply(b.pow(2)).multiply(bd.pow(2)))
+                .add(BigDecimal.valueOf(5).multiply(b.pow(3)).multiply(bd.pow(3)))
+                .add(b.pow(4).multiply(bd.pow(4)));
+
+        BigDecimal term3 = BigDecimal.valueOf(2304).add(BigDecimal.valueOf(2304).multiply(b).multiply(bd))
+                .add(BigDecimal.valueOf(1536).multiply(b.pow(2)).multiply(bd.pow(2)))
+                .add(BigDecimal.valueOf(240).multiply(b.pow(3)).multiply(bd.pow(3)))
+                .subtract(BigDecimal.valueOf(120).multiply(b.pow(4)).multiply(bd.pow(4)))
+                .subtract(BigDecimal.valueOf(60).multiply(b.pow(5)).multiply(bd.pow(5)))
+                .subtract(BigDecimal.valueOf(12).multiply(b.pow(6)).multiply(bd.pow(6)))
+                .subtract(b.pow(7).multiply(bd.pow(7)));
+
+        BigDecimal term4 = BigDecimal.valueOf(12).multiply(a).multiply(bd)
+                .multiply(BigDecimal.valueOf(96).add(BigDecimal.valueOf(96).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(64).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(22).multiply(b.pow(3)).multiply(bd.pow(3)))
+                        .add(BigDecimal.valueOf(3).multiply(b.pow(4)).multiply(bd.pow(4))), mc);
+
+        BigDecimal term5 = BigDecimal.valueOf(6).multiply(a.pow(2)).multiply(bd.pow(2))
+                .multiply(BigDecimal.valueOf(96).add(BigDecimal.valueOf(96).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(64).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(22).multiply(b.pow(3)).multiply(bd.pow(3)))
+                        .add(BigDecimal.valueOf(3).multiply(b.pow(4)).multiply(bd.pow(4))), mc);
+
+        BigDecimal term6 = a.pow(3).multiply(bd.pow(3))
+                .multiply(BigDecimal.valueOf(96).add(BigDecimal.valueOf(96).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(64).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(22).multiply(b.pow(3)).multiply(bd.pow(3)))
+                        .add(BigDecimal.valueOf(3).multiply(b.pow(4)).multiply(bd.pow(4))), mc);
+
+        BigDecimal fz = term1.multiply(term2, mc).add(b.multiply(qy).multiply(term3.add(term4).add(term5).add(term6), mc), mc);
+
+        // Calculate the denominator (fm)
+        BigDecimal fm = BigDecimal.valueOf(384).multiply(bd.pow(3))
+                .multiply(BigDecimal.valueOf(2).add(b.multiply(bd)), mc)
+                .multiply(BigDecimal.valueOf(48).add(BigDecimal.valueOf(12).multiply(a).multiply(bd))
+                        .add(BigDecimal.valueOf(12).multiply(b).multiply(bd))
+                        .add(BigDecimal.valueOf(6).multiply(a.pow(2)).multiply(bd.pow(2)))
+                        .add(BigDecimal.valueOf(6).multiply(b.pow(2)).multiply(bd.pow(2)))
+                        .add(a.pow(3).multiply(bd.pow(3)))
+                        .add(b.pow(3).multiply(bd.pow(3))), mc);
+
+        // Compute the result
+        BigDecimal part1 = h.pow(2).multiply(b.pow(2)).multiply(r).divide(BigDecimal.valueOf(48), mc).negate();
+        BigDecimal part2 = fz.divide(fm, mc);
+
+        BigDecimal result = (part1.add(part2)).divide(e.multiply(i), mc).multiply(BigDecimal.valueOf(5));
+
+        return result;
+    }
+
+
+    //s公式
+//    public boolean computeS(List<Model> models,int index,BigDecimal u){
+//        double temp = 0.0;
+//        double M = models.get(index).getMh().doubleValue();
+//        double U = u.doubleValue();
+//        for(int i = 0; i< index -1; i++){
+//            temp  = temp + models.get(i).getH().doubleValue()*(models.get(i).getW().doubleValue() - 1);
+//        }
+//        double a = M - temp - U;
+//        return M - temp - U >=0;
+//    }
+
+    public boolean computeS(List<GeDataModel> geDataModels, int index, BigDecimal u) {
+        BigDecimal temp = BigDecimal.ZERO;
+        BigDecimal M = geDataModels.get(index).getMh();
+        BigDecimal U = u;
+
+        for (int i = 0; i < index - 1; i++) {
+            BigDecimal h = geDataModels.get(i).getH();
+            BigDecimal w = geDataModels.get(i).getW();
+            temp = temp.add(h.multiply(w.subtract(BigDecimal.ONE)));
+        }
+
+        BigDecimal a = M.subtract(temp).subtract(U);
+        return a.compareTo(BigDecimal.ZERO) >= 0;
+    }
+
+
+    //计算逻辑
+    public List<GeDataModel> compute(List<GeDataModel> geDataModels){
+        LayerLoadCalculator layerLoadCalculator = new LayerLoadCalculator();
+        //这里计算关键层
+        if(geDataModels.getFirst().getAx().doubleValue() >= 279){
+            for(int i = 0; i < geDataModels.size(); i++){
+                geDataModels.get(i).setBy(BigDecimal.valueOf(400));
+            }
+        }
+        //初始化数据
+        geDataModels = this.initModel(geDataModels);
+
+        //计算逻辑
+        for(GeDataModel geDataModel : geDataModels){
+            double u = 0.0;
+            if("true".equals(geDataModel.getIsKeyLayer())){
+                double Mi;
+                double j = -1;
+                boolean ddd = true;
+                for(double i = 1.0;;){
+                    if(i< geDataModel.getBi().intValue()){
+                        geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
+                        geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
+                        Mi  = computeMain1(BigDecimal.valueOf(i), geDataModel.getBi(), geDataModel.getBd(), geDataModel.getQx(), geDataModel.getQy()).doubleValue();
+                    }else{
+                        ddd = false;
+                        break;
+                    }
+
+                    if(abs(Mi)- geDataModel.getM().doubleValue() <= 5 && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
+                        geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
+                        geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
+                        j = i;
+                        break;
+                    }
+                    i = i+ 0.1;
+                }
+
+                if(!ddd){
+                    for(double i = 1.0;;){
+                        geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
+                        geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
+                        Mi = computeMain2(BigDecimal.valueOf(i), geDataModel.getBi(), geDataModel.getBd(), geDataModel.getQx(), geDataModel.getQy()).doubleValue();
+
+                        if(abs(Mi)- geDataModel.getM().doubleValue() <= 5 && abs(Mi)- geDataModel.getM().doubleValue() > 0 ){
+                            geDataModel.setQx(this.computeQx(geDataModel, BigDecimal.valueOf(i)));
+                            geDataModel.setQy(this.computeQy(geDataModel, BigDecimal.valueOf(i)));
+                            j = i;
+                            break;
+                        }
+                        i = i+ 0.1;
+                    }
+
+                    u = computeU2(geDataModel,BigDecimal.valueOf(j)).doubleValue();
+                    geDataModel.setLastAi(BigDecimal.valueOf(j));
+                    if(j > geDataModel.getAi().doubleValue()){
+                        geDataModel.setIsNotCrack("true");
+                        return geDataModels;
+                    }
+                    if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
+                        geDataModel.setIsNotCrack("true");
+                        return geDataModels;
+                    }
+                }else{
+                    u = computeU(geDataModel,BigDecimal.valueOf(j)).doubleValue();
+                    geDataModel.setLastAi(BigDecimal.valueOf(j));
+                    if(j > geDataModel.getAi().doubleValue()){
+                        geDataModel.setIsNotCrack("true");
+                        return geDataModels;
+                    }
+                    if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
+                        geDataModel.setIsNotCrack("true");
+                        return geDataModels;
+                    }
+                }
+
+            }
+        }
+        return geDataModels;
+    }
+
+
+    }
+

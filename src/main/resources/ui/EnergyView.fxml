@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/11.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.EnergyController">
+   <top>
+      <VBox>
+         <MenuBar>
+            <Menu text="File">
+               <MenuItem onAction="#handleClose" text="Close" />
+            </Menu>
+            <Menu text="View">
+               <MenuItem onAction="#handleZoomIn" text="Zoom In" />
+               <MenuItem onAction="#handleZoomOut" text="Zoom Out" />
+               <MenuItem onAction="#handleResetZoom" text="Reset Zoom" />
+            </Menu>
+            <Menu text="Export">
+               <MenuItem onAction="#handleExportImage" text="Export as Image" />
+            </Menu>
+         </MenuBar>
+         <ToolBar>
+            <Button onAction="#handleRefresh" text="Refresh" />
+            <Separator />
+            <Label text="Energy Visualization" />
+            <Separator />
+            <Button onAction="#handleShowDetails" text="Show Details" />
+         </ToolBar>
+      </VBox>
+   </top>
+   <center>
+      <ScrollPane fx:id="scrollPane" fitToHeight="false" fitToWidth="false" pannable="true">
+         <Pane fx:id="energyVisualizationPane" prefHeight="600.0" prefWidth="800.0" />
+      </ScrollPane>
+   </center>
+   <bottom>
+      <VBox>
+         <Label fx:id="statusLabel" text="Status: Ready" />
+         <HBox spacing="10.0">
+            <Label text="Legend:" />
+            <Label text="■ Key Layer" textFill="BLUE" />
+            <Label text="■ Energy Layer" textFill="GREEN" />
+            <Label text="Energy values are displayed next to each layer" />
+         </HBox>
+      </VBox>
+   </bottom>
+</BorderPane>

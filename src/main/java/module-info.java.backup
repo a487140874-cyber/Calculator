@@ -1,0 +1,40 @@
+module com.example.calculator {
+    requires javafx.controls;
+    requires javafx.fxml;
+    requires static lombok;
+    requires easyexcel.core;
+    requires modelmapper;
+    requires java.sql;
+    requires matheclipse.core;
+    requires computeU;
+    requires org.apache.poi.ooxml;
+    requires commons.math3;
+    requires org.apache.commons.lang3;
+    exports com.example.calculator;
+
+    // 导出 modle 包
+    exports geModel;
+    exports ui;
+
+    // 打开 modle 包给 EasyExcel 模块
+    opens geModel;
+    // 打开 com.example.calculaator 包（可以让其他模块访问）
+    opens com.example.calculator;
+    exports getData;
+    opens getData;
+    opens presentation;
+    opens ui to javafx.fxml;
+
+//
+//    open module easyexcel.core {
+//    requires org.apache.poi.ooxml;
+//}
+
+    //运行时需要添加一下jvm参数
+//    --add-opens
+//    com.example.calculator/com.example.calculator=ALL-UNNAMED
+//    --add-reads
+//    com.example.calculator=ALL-UNNAMED
+//    --add-opens
+//    org.apache.poi.ooxml/org.apache.poi.xssf.streaming=easyexcel.core
+}
