@@ -36,7 +36,7 @@ public class EnergyCalculator {
         }
         
         return geDataModels.stream()
-                .filter(model -> "true".equals(model.getIsKeyLayer()))
+                .filter(model -> model.isKeyLayer())
                 .anyMatch(model -> model.getPower() != null);
     }
     
@@ -52,7 +52,7 @@ public class EnergyCalculator {
         }
         
         return geDataModels.stream()
-                .filter(model -> "true".equals(model.getIsKeyLayer()))
+                .filter(model -> model.isKeyLayer())
                 .filter(model -> model.getPower() != null)
                 .count();
     }

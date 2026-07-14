@@ -62,7 +62,7 @@ public class ComputeKeyLayerShi {
 
         double shi =  geDataModels.get(index).getH().doubleValue() * SHI_COEFFICIENT / geDataModels.get(index).getE().doubleValue();
         for(int i = index + 1; i < geDataModels.size(); i++){
-            if("true".equals(geDataModels.get(i).getIsKeyLayer())){
+            if(geDataModels.get(i).isKeyLayer()){
                 break;
             }
             shi = shi + geDataModels.get(i).getH().doubleValue() * SHI_COEFFICIENT / geDataModels.get(i).getE().doubleValue();
@@ -509,7 +509,7 @@ public class ComputeKeyLayerShi {
 
         // 初始化所有关键层的qx、qy和线性图表数据
         for (int i = 0; i < geDataModels.size(); i++) {
-            if ("true".equals(geDataModels.get(i).getIsKeyLayer())) {
+            if (geDataModels.get(i).isKeyLayer()) {
                 geDataModels.get(i).setQx(analyzer.computeQx(geDataModels.get(i)));
                 geDataModels.get(i).setQy(analyzer.computeQy(geDataModels.get(i)));
                 // 初始化关键变量
@@ -520,14 +520,14 @@ public class ComputeKeyLayerShi {
 
         // 计算所有关键层的Shi值
         for (int i = 0; i < geDataModels.size(); i++) {
-            if ("true".equals(geDataModels.get(i).getIsKeyLayer())) {
+            if (geDataModels.get(i).isKeyLayer()) {
                 geDataModels.get(i).setShi(computeShi(geDataModels, i));
             }
         }
 
         // 计算所有关键层的U值
         for (GeDataModel geDataModel : geDataModels) {
-            if ("true".equals(geDataModel.getIsKeyLayer())) {
+            if (geDataModel.isKeyLayer()) {
                 geDataModel.setUix(computeUix(geDataModel));
             }
         }
@@ -535,7 +535,7 @@ public class ComputeKeyLayerShi {
         // 找到isNotCrack为true的岩层（起始层）
         int startLayerIndex = -1;
         for (int i = 0; i < geDataModels.size(); i++) {
-            if ("true".equals(geDataModels.get(i).getIsNotCrack())) {
+            if (geDataModels.get(i).isNotCrack()) {
                 startLayerIndex = i;
                 break;
             }
@@ -549,7 +549,7 @@ public class ComputeKeyLayerShi {
         // 获取所有关键层的索引列表，按顺序排列
         List<Integer> keyLayerIndices = new ArrayList<>();
         for (int i = 0; i < geDataModels.size(); i++) {
-            if ("true".equals(geDataModels.get(i).getIsKeyLayer())) {
+            if (geDataModels.get(i).isKeyLayer()) {
                 keyLayerIndices.add(i);
             }
         }
@@ -576,7 +576,7 @@ public class ComputeKeyLayerShi {
 
                 
                 // 只处理第15层和第18层
-                if ((layerNum == SPECIAL_LAYER_A || layerNum == SPECIAL_LAYER_B) && "true".equals(layer.getIsKeyLayer())) {
+                if ((layerNum == SPECIAL_LAYER_A || layerNum == SPECIAL_LAYER_B) && layer.isKeyLayer()) {
                     // 使用与起始层相同的计算逻辑，但lowbound2使用当前层的lastAi
                     double layerMix, layerMiy;
 

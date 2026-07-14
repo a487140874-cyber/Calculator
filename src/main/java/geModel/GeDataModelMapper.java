@@ -37,6 +37,13 @@ public class GeDataModelMapper {
                 throw new IllegalStateException("拷贝字段失败: " + sourceField.getName(), e);
             }
         }
+
+        // 领域模型用 boolean，Excel 模型用 String，类型不同，上面的反射拷贝会跳过它们，
+        // 必须在此显式转换——否则导出的 Excel 里这两列会静默变空。
+        // 保持与改用 boolean 之前一致的表现：true 导出 "true"，false 导出空单元格。
+        target.setIsKeyLayer(source.isKeyLayer() ? "true" : null);
+        target.setIsNotCrack(source.isNotCrack() ? "true" : null);
+
         return target;
     }
 }

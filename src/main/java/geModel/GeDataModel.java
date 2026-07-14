@@ -17,7 +17,7 @@ public class GeDataModel
     /**
      * 是否为关键层
      */
-    private String isKeyLayer;
+    private boolean isKeyLayer;
 
     /**
      * 当前层数
@@ -144,7 +144,7 @@ public class GeDataModel
     /**
      * 是否不垮落
      */
-    private String isNotCrack;
+    private boolean isNotCrack;
 
 
 

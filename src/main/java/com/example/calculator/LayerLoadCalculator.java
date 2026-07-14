@@ -94,7 +94,7 @@ public class LayerLoadCalculator {
                     loads[i] = calculateLayerLoad(E, h, l, i + 1 , currentLayer);
                     //记录关键层
                     keyLayers.add(currentLayer);
-                    geDataModels.get(i).setIsKeyLayer("true");
+                    geDataModels.get(i).setKeyLayer(true);
                 }
             }
             System.out.println("Layer " + (i + 1) + " Load: " + loads[i]);

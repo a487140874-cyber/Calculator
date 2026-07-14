@@ -134,7 +134,7 @@ public class EnergyController {
                 layerRect.setStroke(Color.GREEN);
                 layerRect.setStrokeWidth(3.0);
                 energyLayerCount++;
-            } else if ("true".equals(model.getIsKeyLayer())) {
+            } else if (model.isKeyLayer()) {
                 // 如果是关键层但没有能量值，使用蓝色边框
                 layerRect.setFill(Color.LIGHTBLUE);
                 layerRect.setStroke(Color.BLUE);
@@ -168,7 +168,7 @@ public class EnergyController {
             energyVisualizationPane.getChildren().add(infoText);
 
             // 如果是关键层，显示关键层信息
-            if ("true".equals(model.getIsKeyLayer())) {
+            if (model.isKeyLayer()) {
                 String keyLayerInfo = String.format("关键层 - 卸荷回弹量:%.6f  最大位移量:%.6f", 
                     model.getShi() != null ? model.getShi().doubleValue() : 0.0,
                     model.getUix() != null ? model.getUix().doubleValue() : 0.0);
@@ -303,7 +303,7 @@ public class EnergyController {
         
         int energyCount = 0;
         for (GeDataModel model : geDataModels) {
-            if ("true".equals(model.getIsKeyLayer()) && model.getPower() != null) {
+            if (model.isKeyLayer() && model.getPower() != null) {
                 energyCount++;
                 details.append(String.format("Layer %s:\n", model.getName() != null ? model.getName() : "Unknown"));
                 details.append(String.format("  Energy: %.6f\n", model.getPower().doubleValue()));

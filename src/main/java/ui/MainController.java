@@ -27,9 +27,7 @@ import com.alibaba.excel.write.metadata.WriteSheet;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainController {
@@ -42,8 +40,8 @@ public class MainController {
     @FXML private TableColumn<GeDataModel, BigDecimal> lCol;
     @FXML private TableColumn<GeDataModel, BigDecimal> eCol;
     @FXML private TableColumn<GeDataModel, BigDecimal> rCol;
-    @FXML private TableColumn<GeDataModel, String> isKeyLayerCol;
-    @FXML private TableColumn<GeDataModel, String> isNotCrackCol;
+    @FXML private TableColumn<GeDataModel, Boolean> isKeyLayerCol;
+    @FXML private TableColumn<GeDataModel, Boolean> isNotCrackCol;
     @FXML private TableColumn<GeDataModel, BigDecimal> lastAiCol;
 
     @FXML private Pane visualizationPane;
@@ -267,7 +265,7 @@ public class MainController {
             Rectangle rect = new Rectangle(xPos, currentY, rectWidth, layerHeight);
 
             // Style the rectangles based on their properties
-            if ("true".equals(layer.getIsKeyLayer())) {
+            if (layer.isKeyLayer()) {
                 rect.setFill(Color.LIGHTCORAL);
                 rect.setStroke(Color.DARKRED);
             } else {
@@ -275,7 +273,7 @@ public class MainController {
                 rect.setStroke(Color.BLACK);
             }
 
-            if ("true".equals(layer.getIsNotCrack())) {
+            if (layer.isNotCrack()) {
                 // 使用JavaFX支持的linear-gradient替代repeating-linear-gradient
                 rect.setStyle("-fx-fill: linear-gradient(from 0% 0% to 100% 100%, #FF6347 0%, #FF6347 25%, #CD5C5C 25%, #CD5C5C 50%, #FF6347 50%, #FF6347 75%, #CD5C5C 75%, #CD5C5C 100%);");
             }

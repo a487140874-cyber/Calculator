@@ -55,7 +55,7 @@ public class KeyLayerAnalyzer {
             //计算i
             geDataModel.setI(computeI(geDataModel.getB(), geDataModel.getH()));
             //计算q
-            if("true".equals(geDataModel.getIsKeyLayer())){
+            if(geDataModel.isKeyLayer()){
                 geDataModel.setQ(computeQ(geDataModels, geDataModel.getNum()));
             }
         }
@@ -63,7 +63,7 @@ public class KeyLayerAnalyzer {
         for(GeDataModel geDataModel : geDataModels){
 //            BigDecimal sumQ = BigDecimal.ZERO;
 //            //当前层不是关键层
-//            if(!"true".equals(model.getIsKeyLayer())){
+//            if(!model.isKeyLayer()){
 //                sumQ = sumQ.add(model.getQ());
 //            }else{
 //                sumQ = sumQ.add(model.getQ());
@@ -84,7 +84,7 @@ public class KeyLayerAnalyzer {
 
         //计算qx和qy
         for(GeDataModel geDataModel : geDataModels){
-            if("true".equals(geDataModel.getIsKeyLayer())){
+            if(geDataModel.isKeyLayer()){
                 geDataModel.setQx(computeQx(geDataModel));
                 geDataModel.setQy(computeQy(geDataModel));
             }
@@ -94,32 +94,33 @@ public class KeyLayerAnalyzer {
     }
 
     /**
-     * 计算M1和M2
+     * 计算M1和M2。
+     *
+     * <p><b>⚠ 这里原本有一个「当前层不破断」的分支，但它从未执行过。</b>
+     *
+     * <p>原代码的判断条件是 {@code "false".equals(getIsNotCrack())}，而 isNotCrack
+     * 在整个项目里只会被设成 {@code "true"} 或保持 {@code null}——<b>从来没有任何地方
+     * 把它设成 {@code "false"}</b>。因此该条件恒为 false，「不破断」分支是死代码，
+     * 实际每一层走的都是下面「本层破断」的逻辑。
+     *
+     * <p>作者的本意几乎可以肯定是「本层不破断时」（即 {@code !isNotCrack()}），
+     * 但按本意修正会改变所有岩层的 M1/M2，进而改变计算结果。此处如实保留原行为
+     * （恒走破断分支），死分支已删除。原代码见 {@code git show baseline-original}。
+     * 待你确认后再决定是否按本意修复。
      */
     public GeDataModel computeM12(List<GeDataModel> geDataModels, GeDataModel geDataModel)
     {
-        //当前层不破断
-        if("false".equals(geDataModel.getIsNotCrack())){
-            geDataModel.setM1(geDataModel.getH());
-            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
-                if("true".equals(geDataModels.get(i).getIsKeyLayer())){
-                    geDataModel.setM2(geDataModels.get(i).getH().subtract(geDataModel.getH()));
-                    break;
-                }
-            }
-        }else{
-            //本层破断
-            for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
-                if("true".equals(geDataModels.get(i).getIsKeyLayer())){
-                    geDataModel.setM1(geDataModels.get(i).getH());
-                    for(int j = i + 1; j < geDataModels.size(); j++){
-                        if("true".equals(geDataModels.get(j).getIsKeyLayer())){
-                            geDataModel.setM2(geDataModels.get(j).getH().subtract(geDataModels.get(i).getH()));
-                            break;
-                        }
+        //本层破断
+        for(int i = geDataModel.getNum(); i < geDataModels.size(); i++){
+            if(geDataModels.get(i).isKeyLayer()){
+                geDataModel.setM1(geDataModels.get(i).getH());
+                for(int j = i + 1; j < geDataModels.size(); j++){
+                    if(geDataModels.get(j).isKeyLayer()){
+                        geDataModel.setM2(geDataModels.get(j).getH().subtract(geDataModels.get(i).getH()));
+                        break;
                     }
-                    break;
                 }
+                break;
             }
         }
         return geDataModel;
@@ -133,7 +134,7 @@ public class KeyLayerAnalyzer {
         double q = 0.0;//体积力乘高度，rh和
         //获得本关键层的下一个关键层是第几层
         for(int i = index; i< geDataModels.size(); i++){
-            if("true".equals(geDataModels.get(i).getIsKeyLayer())){
+            if(geDataModels.get(i).isKeyLayer()){
                 next = i;
                 break;
             }
@@ -619,7 +620,7 @@ public class KeyLayerAnalyzer {
         //计算逻辑
         for(GeDataModel geDataModel : geDataModels){
             double u = 0.0;
-            if("true".equals(geDataModel.getIsKeyLayer())){
+            if(geDataModel.isKeyLayer()){
                 double Mi;
                 double j = -1;
                 boolean ddd = true;
@@ -664,22 +665,22 @@ public class KeyLayerAnalyzer {
                     u = computeU2(geDataModel,BigDecimal.valueOf(j)).doubleValue();
                     geDataModel.setLastAi(BigDecimal.valueOf(j));
                     if(j > geDataModel.getAi().doubleValue()){
-                        geDataModel.setIsNotCrack("true");
+                        geDataModel.setNotCrack(true);
                         return geDataModels;
                     }
                     if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
-                        geDataModel.setIsNotCrack("true");
+                        geDataModel.setNotCrack(true);
                         return geDataModels;
                     }
                 }else{
                     u = computeU(geDataModel,BigDecimal.valueOf(j)).doubleValue();
                     geDataModel.setLastAi(BigDecimal.valueOf(j));
                     if(j > geDataModel.getAi().doubleValue()){
-                        geDataModel.setIsNotCrack("true");
+                        geDataModel.setNotCrack(true);
                         return geDataModels;
                     }
                     if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
-                        geDataModel.setIsNotCrack("true");
+                        geDataModel.setNotCrack(true);
                         return geDataModels;
                     }
                 }

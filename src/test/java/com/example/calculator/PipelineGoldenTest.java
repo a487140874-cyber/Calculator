@@ -106,9 +106,12 @@ class PipelineGoldenTest {
             put(sb, "b", m.getB());
             put(sb, "w", m.getW());
             put(sb, "mh", m.getMh());
-            // 判定结果
-            sb.append("  isKeyLayer=").append(m.getIsKeyLayer()).append('\n');
-            sb.append("  isNotCrack=").append(m.getIsNotCrack()).append('\n');
+            // 判定结果。
+            // 这两个字段已从 String 改为 boolean，但此处刻意沿用改造前的表示法
+            // （true -> "true"，false -> "null"），好让快照与改造前逐字节一致——
+            // 这样基线文件本身就成了「boolean 转换未改变任何行为」的证明。
+            sb.append("  isKeyLayer=").append(m.isKeyLayer() ? "true" : "null").append('\n');
+            sb.append("  isNotCrack=").append(m.isNotCrack() ? "true" : "null").append('\n');
             // 计算中间量
             put(sb, "i", m.getI());
             put(sb, "ai", m.getAi());
