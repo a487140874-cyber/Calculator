@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 3D岩层可视化脚本
-根据岩层数据生成3D图像，包含煤层和各个岩层
+根据岩层数据生成3D图像，并在所有导入岩层下方固定绘制产品要求的空心煤层
 """
 
 import json
 import sys
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
@@ -118,23 +120,9 @@ def generate_3d_visualization(data, output_path):
         ax_value = data['ax']
         by_value = data['by']
         
-        # ========== 特殊处理模式判断 ==========
-        # 当ax >= 279时启用特殊显示逻辑
-        # 特殊处理包括：
-        # 1. 第15层绿色能量立方体改为红色
-        # 2. 第18层不显示绿色能量立方体
-        # 3. 汇聚线终止于第15层下平面而不是最后一个有能量的层
-        # 注意：删除此段代码可恢复原始逻辑
-        #
-        # 此阈值必须与 Java 侧保持一致（KeyLayerAnalyzer.LARGE_AX_THRESHOLD 与
-        # ComputeKeyLayerShi.SPECIAL_MODE_AX_THRESHOLD），三处判定的是同一个工况。
-        # 原为 280，与 Java 侧的 279 不一致，现统一为 279。
-        SPECIAL_MODE_AX_THRESHOLD = 279
-        is_special_mode = ax_value >= SPECIAL_MODE_AX_THRESHOLD
-        special_layer_15_bottom_z = None  # 用于存储第15层的下平面Z坐标
-        # ========== 特殊处理模式判断结束 ==========
-        
-        # 计算平均层厚
+        if not layers:
+            raise ValueError('岩层数据不能为空')
+
         total_thickness = sum(float(layer['h']) for layer in layers)
         avg_thickness = total_thickness / len(layers)
         
@@ -146,34 +134,32 @@ def generate_3d_visualization(data, output_path):
         max_dim = max(ax_value, by_value, total_thickness)
         buffer = max_dim * 0.1  # 减小buffer值，使图像更充满坐标系
         
-        # 创建煤层（最下方的空心立方体）- 调整坐标使零点对齐
+        # 产品要求：在所有导入岩层下方固定绘制一个空心煤层
         coal_height = avg_thickness
         coal_outer_vertices = create_cube_vertices(
-            0, ax_value, 
-            0, by_value, 
+            0, ax_value,
+            0, by_value,
             0, coal_height
         )
-        
-        # 煤层内部空洞 - 稍微缩小内部空洞
+
         inner_margin = min(ax_value, by_value) * 0.1  # 内部边距
         coal_inner_vertices = create_cube_vertices(
-            inner_margin, ax_value - inner_margin, 
-            inner_margin, by_value - inner_margin, 
-            coal_height/2, coal_height
+            inner_margin, ax_value - inner_margin,
+            inner_margin, by_value - inner_margin,
+            coal_height / 2, coal_height
         )
-        
-        # 创建煤层面
+
         coal_faces = create_hollow_cube_faces(coal_outer_vertices, coal_inner_vertices)
-        coal_collection = Poly3DCollection(coal_faces, alpha=0.6, facecolor='black', edgecolor='darkgray')
+        coal_collection = Poly3DCollection(
+            coal_faces, alpha=0.6, facecolor='black', edgecolor='darkgray')
         ax.add_collection3d(coal_collection)
-        
-        # 添加从煤层挖空部分顶点汇聚到上方中心点的四条线
-        # 煤层内部空洞的上表面四个顶点 - 使用新的内部边距
+
+        # 汇聚线从固定煤层内部空洞上表面的四个角点出发
         inner_top_vertices = [
-            [inner_margin, inner_margin, coal_height],           # 左前角
-            [ax_value - inner_margin, inner_margin, coal_height],    # 右前角
-            [ax_value - inner_margin, by_value - inner_margin, coal_height],  # 右后角
-            [inner_margin, by_value - inner_margin, coal_height]     # 左后角
+            [inner_margin, inner_margin, coal_height],
+            [ax_value - inner_margin, inner_margin, coal_height],
+            [ax_value - inner_margin, by_value - inner_margin, coal_height],
+            [inner_margin, by_value - inner_margin, coal_height]
         ]
         
         # 计算上平面中心点
@@ -189,13 +175,10 @@ def generate_3d_visualization(data, output_path):
         # 创建岩层
         current_z = coal_height
         
-        # 计算最后一层的上表面高度
-        total_height = coal_height + sum(float(layer['h']) for layer in layers)
-        
         # 找到最后一个带有能量的层，用于确定汇聚线的消失点
-        last_energy_layer_bottom = coal_height  # 默认为煤层顶部
-        last_energy_layer_top = coal_height  # 默认为煤层顶部
-        temp_z = coal_height  # 使用临时变量计算高度
+        last_energy_layer_bottom = coal_height
+        last_energy_layer_top = coal_height
+        temp_z = coal_height
         for i, layer in enumerate(layers):
             layer_thickness = float(layer['h'])
             layer_energy = layer.get('power')
@@ -215,12 +198,7 @@ def generate_3d_visualization(data, output_path):
             layer_energy = layer.get('power')  # 获取岩层能量
             layer_num = layer.get('num', i+1)  # 获取岩层编号
             
-            # ========== 特殊处理：记录第15层的下平面Z坐标 ==========
-            if is_special_mode and layer_num == 15:
-                special_layer_15_bottom_z = current_z
-            # ========== 特殊处理结束 ==========
-            
-            # 计算当前层的层高（当前层下所有岩层的层厚之和，不包括煤层）
+            # 层高只统计固定煤层上方的导入岩层厚度
             layer_height = current_z - coal_height
             
             # 创建岩层立方体 - 调整坐标使零点对齐
@@ -238,32 +216,12 @@ def generate_3d_visualization(data, output_path):
                 xs, ys, zs = zip(*edge)
                 ax.plot(xs, ys, zs, color='lightgray', linewidth=0.5, alpha=0.6)
             
-            # ========== 特殊处理：能量立方体显示逻辑 ==========
-            # 原始逻辑：如果岩层有能量，计算汇聚线与该岩层下平面的交汇点并绘制浅绿色平面
-            # 特殊处理：当ax >= 280时，第15层改为红色，第18层不显示
-            should_draw_energy_cube = False
+            # 如果岩层有能量，计算汇聚线与该岩层下平面的交汇点并绘制浅绿色立方体
+            should_draw_energy_cube = layer_energy is not None and layer_energy > 0
             energy_cube_color = 'lightgreen'
             energy_edge_color = 'darkgreen'
-            
-            if layer_energy is not None and layer_energy > 0:
-                if is_special_mode:
-                    if layer_num == 15:
-                        # 第15层：绿色改为红色
-                        should_draw_energy_cube = True
-                        energy_cube_color = 'lightcoral'
-                        energy_edge_color = 'darkred'
-                    elif layer_num == 18:
-                        # 第18层：不显示绿色立方体
-                        should_draw_energy_cube = False
-                    else:
-                        # 其他有能量的层：正常显示绿色
-                        should_draw_energy_cube = True
-                else:
-                    # 正常模式：所有有能量的层都显示绿色
-                    should_draw_energy_cube = True
-            
+
             if should_draw_energy_cube:
-                # ========== 特殊处理结束 ==========
                 layer_bottom_z = current_z
                 
                 # 计算四条汇聚线与该岩层下平面的交汇点
@@ -311,14 +269,11 @@ def generate_3d_visualization(data, output_path):
                                    top_intersection_points[next_i], top_intersection_points[i]]
                         cube_faces.append(side_face)
                     
-                    # ========== 特殊处理：使用动态颜色绘制立方体 ==========
-                    # 原始代码：绘制浅绿色立方体 - 增强3D视觉效果
-                    # 特殊处理：根据前面设置的颜色变量来绘制
+                    # 绘制浅绿色立方体
                     cube_collection = Poly3DCollection(cube_faces, alpha=0.7, 
                                                      facecolors=energy_cube_color, 
                                                      edgecolors=energy_edge_color, linewidths=2)
                     ax.add_collection3d(cube_collection)
-                    # ========== 特殊处理结束 ==========
                     
                     # 在汇聚线附近添加集中的标注
                     # 计算绿色层的中心位置
@@ -439,18 +394,10 @@ def generate_3d_visualization(data, output_path):
             
             current_z += layer_thickness
         
-        # ========== 特殊处理：汇聚线终点计算 ==========
         # 绘制四条汇聚线（限制在最后一个有能量层的下表面以内）
-        # 特殊处理：当ax >= 280时，汇聚线终止于第15层下平面
         # 增强汇聚线的可见性和层次关系
         for i, vertex in enumerate(inner_top_vertices):
-            # 计算线的终点
-            if is_special_mode and special_layer_15_bottom_z is not None:
-                # 特殊模式：限制在第15层下表面
-                target_z = special_layer_15_bottom_z
-            else:
-                # 正常模式：限制在最后一个有能量层的下表面
-                target_z = last_energy_layer_bottom
+            target_z = last_energy_layer_bottom
             
             if convergence_point[2] > target_z:
                 # 计算与目标层下表面的交点
@@ -466,8 +413,6 @@ def generate_3d_visualization(data, output_path):
                     end_x, end_y, end_z = convergence_point
             else:
                 end_x, end_y, end_z = convergence_point
-            # ========== 特殊处理结束 ==========
-            
             # 使用不同颜色和样式来区分四条汇聚线
             colors = ['red', 'darkred', 'crimson', 'maroon']
             line_styles = ['-', '-', '-', '-']
@@ -492,7 +437,7 @@ def generate_3d_visualization(data, output_path):
                       color=colors[i % len(colors)], s=50, alpha=0.8, 
                       edgecolors='black', linewidth=1)
         
-        # 在汇聚点添加特殊标记
+        # 在汇聚点添加星形标记
         if convergence_point[2] <= last_energy_layer_bottom:
             ax.scatter([convergence_point[0]], [convergence_point[1]], [convergence_point[2]], 
                       color='gold', s=100, alpha=0.9, marker='*', 
@@ -511,7 +456,7 @@ def generate_3d_visualization(data, output_path):
         ax.set_zlim(0, current_z)
         
         # 设置标题 - 更新描述
-        ax.set_title('3D地质分层图 - 煤层(黑色)、岩层(灰框)、能量层(绿色)\n标注已外置到坐标系外', 
+        ax.set_title('3D地质分层图 - 固定煤层(黑色)、岩层(灰框)、正能量层(绿色)\n标注已外置到坐标系外',
                     fontsize=16, pad=20, weight='bold')
         
         # 优化视角设置 - 更好的3D观察角度

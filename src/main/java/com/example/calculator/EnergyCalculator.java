@@ -21,7 +21,11 @@ public class EnergyCalculator {
         }
         
         // 调用ComputeKeyLayerShi中的主要计算方法
-        return ComputeKeyLayerShi.computeMain(geDataModels);
+        List<GeDataModel> result = ComputeKeyLayerShi.computeMain(geDataModels);
+        if (result == null) {
+            throw new IllegalStateException("未找到可用于能量计算的稳定关键层");
+        }
+        return result;
     }
     
     /**
@@ -37,7 +41,7 @@ public class EnergyCalculator {
         
         return geDataModels.stream()
                 .filter(model -> model.isKeyLayer())
-                .anyMatch(model -> model.getPower() != null);
+                .anyMatch(model -> model.getPower() != null && model.getPower().signum() > 0);
     }
     
     /**
@@ -53,7 +57,7 @@ public class EnergyCalculator {
         
         return geDataModels.stream()
                 .filter(model -> model.isKeyLayer())
-                .filter(model -> model.getPower() != null)
+                .filter(model -> model.getPower() != null && model.getPower().signum() > 0)
                 .count();
     }
 }

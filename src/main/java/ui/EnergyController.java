@@ -2,9 +2,17 @@ package ui;
 
 import geModel.GeDataModel;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.Group;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
@@ -12,9 +20,12 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.scene.transform.Scale;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
-import java.math.BigDecimal;
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -28,22 +39,14 @@ public class EnergyController {
 
     private List<GeDataModel> geDataModels;
     private double zoomFactor = 1.0;
-    private BigDecimal ax; // 添加ax变量
+    private final Scale zoomTransform = new Scale(1, 1, 0, 0);
+    private StackPane zoomContainer;
 
     /**
      * 设置要显示的数据
      */
     public void setData(List<GeDataModel> geDataModels) {
         this.geDataModels = geDataModels;
-        // 获取ax值
-        if (geDataModels != null && !geDataModels.isEmpty()) {
-            for (GeDataModel model : geDataModels) {
-                if (model.getAx() != null) {
-                    this.ax = model.getAx();
-                    break;
-                }
-            }
-        }
         drawEnergyVisualization();
     }
 
@@ -55,6 +58,13 @@ public class EnergyController {
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setPannable(true);
+
+        scrollPane.setContent(null);
+        Group zoomGroup = new Group(energyVisualizationPane);
+        zoomContainer = new StackPane(zoomGroup);
+        zoomContainer.setAlignment(Pos.TOP_LEFT);
+        scrollPane.setContent(zoomContainer);
+        energyVisualizationPane.getTransforms().add(zoomTransform);
         
         // 添加滚轮事件处理
         scrollPane.setOnScroll(event -> {
@@ -65,13 +75,6 @@ public class EnergyController {
                 } else {
                     handleZoomOut();
                 }
-                event.consume();
-            } else {
-                // 普通滚轮进行垂直滚动
-                double deltaY = event.getDeltaY() * 2; // 增加滚动速度
-                double currentVvalue = scrollPane.getVvalue();
-                double newVvalue = currentVvalue - deltaY / energyVisualizationPane.getHeight();
-                scrollPane.setVvalue(Math.max(0, Math.min(1, newVvalue)));
                 event.consume();
             }
         });
@@ -99,8 +102,8 @@ public class EnergyController {
 
         // 找到最大能量值用于标注比例
         for (GeDataModel model : geDataModels) {
-            if (model.getPower() != null) {
-                double energy = Math.abs(model.getPower().doubleValue());
+            if (hasPositiveEnergy(model)) {
+                double energy = model.getPower().doubleValue();
                 if (energy > maxEnergy) {
                     maxEnergy = energy;
                 }
@@ -114,21 +117,10 @@ public class EnergyController {
             // 绘制岩层矩形
             Rectangle layerRect = new Rectangle(50, currentY, layerWidth, layerHeight);
             
-            // 检查是否为特殊处理情况（ax >= 280）
-            boolean isSpecialMode = (ax != null && ax.compareTo(new BigDecimal("280")) >= 0);
-            int layerNumber = i + 1; // 层号从1开始
-            
-            // 特殊处理第15层（ax >= 280时）
-            if (isSpecialMode && layerNumber == 15) {
-                layerRect.setFill(Color.RED);
-                layerRect.setStroke(Color.DARKRED);
-                layerRect.setStrokeWidth(3.0);
-                energyLayerCount++;
-            }
             // 如果有能量值，将整个岩层背景设为绿色
-            else if (model.getPower() != null) {
+            if (hasPositiveEnergy(model)) {
                 // 根据能量值大小调整绿色深度
-                double energyRatio = Math.abs(model.getPower().doubleValue()) / (maxEnergy > 0 ? maxEnergy : 1.0);
+                double energyRatio = model.getPower().doubleValue() / (maxEnergy > 0 ? maxEnergy : 1.0);
                 Color energyColor = Color.color(0.7 - energyRatio * 0.2, 0.8 + energyRatio * 0.2, 0.7 - energyRatio * 0.2); // 正确的绿色系背景
                 layerRect.setFill(energyColor);
                 layerRect.setStroke(Color.GREEN);
@@ -178,32 +170,8 @@ public class EnergyController {
                 energyVisualizationPane.getChildren().add(keyText);
             }
 
-            // 特殊处理第15层的标注（ax >= 280时）
-            if (isSpecialMode && layerNumber == 15) {
-                Text specialMark = new Text(600, currentY + 25, "强矿压主控岩层");
-                specialMark.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-                specialMark.setFill(Color.WHITE);
-                
-                // 添加红色背景框
-                Rectangle specialBox = new Rectangle(595, currentY + 12, 120, 20);
-                specialBox.setFill(Color.DARKRED);
-                specialBox.setStroke(Color.RED);
-                specialBox.setStrokeWidth(2.0);
-                specialBox.setOpacity(0.8);
-                energyVisualizationPane.getChildren().add(specialBox);
-                energyVisualizationPane.getChildren().add(specialMark);
-                
-                // 如果第15层有能量值，也要显示能量信息
-                if (model.getPower() != null) {
-                    String energyInfo = String.format("能量: %.6f MJ", model.getPower().doubleValue());
-                    Text energyText = new Text(300, currentY + 50, energyInfo);
-                    energyText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-                    energyText.setFill(Color.BLUE);
-                    energyVisualizationPane.getChildren().add(energyText);
-                }
-            }
             // 如果有能量值，显示能量信息（重点标注）
-            else if (model.getPower() != null) {
+            if (hasPositiveEnergy(model)) {
                 String energyInfo = String.format("能量: %.6f MJ", model.getPower().doubleValue());
                 Text energyText = new Text(300, currentY + 50, energyInfo); // 调整Y位置避免遮挡
                 energyText.setFont(Font.font("Arial", FontWeight.BOLD, 14));
@@ -211,40 +179,18 @@ public class EnergyController {
                 
                 energyVisualizationPane.getChildren().add(energyText);
                 
-                // 特殊模式下，15和18层不显示"能量积聚岩层"
-                if (isSpecialMode) {
-                    // 15和18层不显示"能量积聚岩层"标注（15层已在上面处理）
-                } else {
-                    // 正常模式：在有能量值的岩层添加"能量积聚岩层"标注
-                    Text specialMark = new Text(600, currentY + 25, "能量积聚岩层"); // 调整X位置避免遮挡
-                    specialMark.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-                    specialMark.setFill(Color.ORANGE);
-                    
-                    // 添加背景框
-                    Rectangle specialBox = new Rectangle(595, currentY + 12, 100, 20);
-                    specialBox.setFill(Color.YELLOW);
-                    specialBox.setStroke(Color.ORANGE);
-                    specialBox.setStrokeWidth(2.0);
-                    specialBox.setOpacity(0.6);
-                    energyVisualizationPane.getChildren().add(specialBox);
-                    energyVisualizationPane.getChildren().add(specialMark);
-                }
-            }
-            
-            // 特殊模式下，第20层显示"能量积聚岩层"标注（无论是否有能量值）
-            if (isSpecialMode && layerNumber == 20) {
-                Text specialMark = new Text(600, currentY + 25, "能量积聚岩层");
-                specialMark.setFont(Font.font("Arial", FontWeight.BOLD, 14));
-                specialMark.setFill(Color.ORANGE);
-                
+                Text energyMark = new Text(600, currentY + 25, "能量积聚岩层");
+                energyMark.setFont(Font.font("Arial", FontWeight.BOLD, 14));
+                energyMark.setFill(Color.ORANGE);
+
                 // 添加背景框
-                Rectangle specialBox = new Rectangle(595, currentY + 12, 100, 20);
-                specialBox.setFill(Color.YELLOW);
-                specialBox.setStroke(Color.ORANGE);
-                specialBox.setStrokeWidth(2.0);
-                specialBox.setOpacity(0.6);
-                energyVisualizationPane.getChildren().add(specialBox);
-                energyVisualizationPane.getChildren().add(specialMark);
+                Rectangle energyBox = new Rectangle(595, currentY + 12, 100, 20);
+                energyBox.setFill(Color.YELLOW);
+                energyBox.setStroke(Color.ORANGE);
+                energyBox.setStrokeWidth(2.0);
+                energyBox.setOpacity(0.6);
+                energyVisualizationPane.getChildren().add(energyBox);
+                energyVisualizationPane.getChildren().add(energyMark);
             }
         }
 
@@ -258,6 +204,7 @@ public class EnergyController {
         double totalHeight = startY + geDataModels.size() * (layerHeight + spacing) + 100;
         energyVisualizationPane.setPrefHeight(totalHeight);
         energyVisualizationPane.setPrefWidth(layerWidth + 150);
+        updateZoomContainerSize();
 
         statusLabel.setText(String.format("Status: 可视化完成。共%d层，其中%d层有能量值。最大能量值: %.6f", 
             geDataModels.size(), energyLayerCount, maxEnergy));
@@ -287,9 +234,18 @@ public class EnergyController {
     }
 
     private void applyZoom() {
-        energyVisualizationPane.setScaleX(zoomFactor);
-        energyVisualizationPane.setScaleY(zoomFactor);
+        zoomFactor = Math.max(0.25, Math.min(4.0, zoomFactor));
+        zoomTransform.setX(zoomFactor);
+        zoomTransform.setY(zoomFactor);
+        updateZoomContainerSize();
         statusLabel.setText(String.format("Status: Zoom %.0f%%", zoomFactor * 100));
+    }
+
+    private void updateZoomContainerSize() {
+        if (zoomContainer == null) return;
+        zoomContainer.setPrefSize(
+                energyVisualizationPane.getPrefWidth() * zoomFactor,
+                energyVisualizationPane.getPrefHeight() * zoomFactor);
     }
 
     @FXML
@@ -303,7 +259,7 @@ public class EnergyController {
         
         int energyCount = 0;
         for (GeDataModel model : geDataModels) {
-            if (model.isKeyLayer() && model.getPower() != null) {
+            if (model.isKeyLayer() && hasPositiveEnergy(model)) {
                 energyCount++;
                 details.append(String.format("Layer %s:\n", model.getName() != null ? model.getName() : "Unknown"));
                 details.append(String.format("  Energy: %.6f\n", model.getPower().doubleValue()));
@@ -317,16 +273,55 @@ public class EnergyController {
             details.append("No energy values calculated yet.");
         }
 
-        // 这里可以显示一个详细信息对话框
-        // 为了简化，我们只更新状态标签
-        statusLabel.setText(String.format("Status: %d layers have energy values. Check console for details.", energyCount));
-        System.out.println(details.toString());
+        TextArea textArea = new TextArea(details.toString());
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefSize(560, 420);
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Energy Calculation Details");
+        alert.setHeaderText(energyCount + " layers have positive energy values");
+        alert.getDialogPane().setContent(textArea);
+        alert.showAndWait();
+        statusLabel.setText(String.format("Status: Displayed details for %d energy layers.", energyCount));
     }
 
     @FXML
     private void handleExportImage() {
-        // 简化版本：暂时不支持图像导出功能
-        statusLabel.setText("Status: Image export feature is not available in this version.");
+        if (geDataModels == null || geDataModels.isEmpty()) {
+            statusLabel.setText("Status: No energy visualization to export.");
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export Energy Visualization");
+        chooser.setInitialFileName("energy-visualization.png");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG Image", "*.png"));
+        File file = chooser.showSaveDialog(energyVisualizationPane.getScene().getWindow());
+        if (file == null) return;
+
+        try {
+            WritableImage image = energyVisualizationPane.snapshot(new SnapshotParameters(), null);
+            BufferedImage bufferedImage = new BufferedImage(
+                    (int) image.getWidth(), (int) image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < bufferedImage.getHeight(); y++) {
+                for (int x = 0; x < bufferedImage.getWidth(); x++) {
+                    bufferedImage.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                }
+            }
+            if (!ImageIO.write(bufferedImage, "png", file)) {
+                throw new IOException("No PNG writer is available.");
+            }
+            statusLabel.setText("Status: Image exported to " + file.getName() + ".");
+        } catch (IOException e) {
+            Alert alert = new Alert(Alert.AlertType.ERROR,
+                    "Could not export the image: " + e.getMessage(), ButtonType.OK);
+            alert.setHeaderText(null);
+            alert.showAndWait();
+            statusLabel.setText("Status: Image export failed.");
+        }
+    }
+
+    private boolean hasPositiveEnergy(GeDataModel model) {
+        return model.getPower() != null && model.getPower().signum() > 0;
     }
 
     @FXML

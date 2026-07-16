@@ -10,8 +10,8 @@
         <VBox>
             <MenuBar>
                 <Menu mnemonicParsing="false" text="File">
-                    <MenuItem mnemonicParsing="false" onAction="#handleImportExcel" text="Import from Excel..." />
-                    <MenuItem mnemonicParsing="false" onAction="#handleExportExcel" text="Export to Excel..." />
+                    <MenuItem fx:id="importMenuItem" mnemonicParsing="false" onAction="#handleImportExcel" text="Import from Excel..." />
+                    <MenuItem fx:id="exportMenuItem" mnemonicParsing="false" onAction="#handleExportExcel" text="Export to Excel..." />
                     <SeparatorMenuItem mnemonicParsing="false" />
                     <MenuItem mnemonicParsing="false" onAction="#handleExit" text="Exit" />
                 </Menu>
@@ -20,7 +20,7 @@
                 </Menu>
             </MenuBar>
             <ToolBar>
-                <Button onAction="#handleImportExcel" text="Import Data" />
+                <Button fx:id="importButton" onAction="#handleImportExcel" text="Import Data" />
                 <Button fx:id="calculateKeyLayersButton" onAction="#handleCalculateKeyLayers" text="1. Calculate Key Layers" />
                 <Button fx:id="calculateCollapseButton" onAction="#handleCalculateCollapse" text="2. Calculate Collapse" />
                 <Button fx:id="calculateEnergyButton" onAction="#handleCalculateEnergy" text="3. Calculate Energy" />
@@ -40,7 +40,7 @@
                     <TableColumn fx:id="eCol" prefWidth="100.0" text="E (Elasticity)" />
                     <TableColumn fx:id="rCol" prefWidth="100.0" text="R (Tensile)" />
                     <TableColumn fx:id="isKeyLayerCol" prefWidth="100.0" text="Is Key Layer?" />
-                    <TableColumn fx:id="isNotCrackCol" prefWidth="100.0" text="Will Collapse?" />
+                    <TableColumn fx:id="isNotCrackCol" prefWidth="100.0" text="Remains Stable?" />
                     <TableColumn fx:id="lastAiCol" prefWidth="100.0" text="Fracture Dist." />
                 </columns>
                 <columnResizePolicy>

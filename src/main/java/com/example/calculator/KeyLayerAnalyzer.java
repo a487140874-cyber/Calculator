@@ -15,19 +15,6 @@ import static java.lang.Math.abs;
  */
 public class KeyLayerAnalyzer {
 
-    /**
-     * 推进距离 ax 达到该值时，视为「大推进距离」工况，强制把所有岩层的 by 改写为
-     * {@link #FORCED_BY_ON_LARGE_AX}。
-     *
-     * <p>此阈值必须与 {@link ComputeKeyLayerShi#SPECIAL_MODE_AX_THRESHOLD}、以及
-     * Python 脚本 {@code generate_3d_layers.py} 中的判定保持一致——三处判定的是
-     * 同一个工况。（原先此处为 279、另两处为 280，ax=279 时行为分叉，现已统一为 279。）
-     */
-    private static final double LARGE_AX_THRESHOLD = 279;
-
-    /** 大推进距离工况下，强制覆盖所有岩层的 by 值。 */
-    private static final BigDecimal FORCED_BY_ON_LARGE_AX = BigDecimal.valueOf(400);
-
     /** 破断步距搜索：起始值。 */
     private static final double FRACTURE_SEARCH_START = 1.0;
 
@@ -637,13 +624,6 @@ public class KeyLayerAnalyzer {
 
     //计算逻辑
     public List<GeDataModel> compute(List<GeDataModel> geDataModels){
-        LayerLoadCalculator layerLoadCalculator = new LayerLoadCalculator();
-        //这里计算关键层
-        if(geDataModels.getFirst().getAx().doubleValue() >= LARGE_AX_THRESHOLD){
-            for(int i = 0; i < geDataModels.size(); i++){
-                geDataModels.get(i).setBy(FORCED_BY_ON_LARGE_AX);
-            }
-        }
         //初始化数据
         geDataModels = this.initModel(geDataModels);
 
@@ -731,4 +711,3 @@ public class KeyLayerAnalyzer {
 
 
     }
-
