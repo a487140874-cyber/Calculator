@@ -23,6 +23,14 @@
     -text-main: #16202A;
     -text-soft: #5A6874;
     -text-muted: #8A97A3;
+    -hover-bg: #F2F5F7;
+    -input-bg: #FFFFFF;
+    -column-header-bg: #F7F9FA;
+    -column-header-fg: #3F4C58;
+    -banner-info-bg: #F7F9FA;    -banner-info-bd: -border-strong;
+    -banner-success-bg: derive(-accent-teal, 92%); -banner-success-bd: #BFDCD6;
+    -banner-warning-bg: #FDF7E9; -banner-warning-bd: #ECD7A4;
+    -banner-danger-bg: #FDF1EC;  -banner-danger-bd: #EECFC4;
 
     -lith-mudstone: #A79F95;
     -lith-sandy-mudstone: #B9B2A4;
@@ -42,6 +50,42 @@
     -fx-font-size: 12.5px;
     -fx-text-fill: -text-main;
     -fx-background-color: -bg-main;
+}
+
+/* ---- 1b. Dark theme (design① palette), toggled via .theme-dark on the scene root ---- */
+.root.theme-dark {
+    -bg-main: #0F1720;
+    -panel-white: #151F2B;
+    -panel-soft: #1B2735;
+    -border: #2C3B4D;
+    -divider: #23303f;
+    -border-strong: #3F566E;
+    -primary: #4DA3FF;
+    -primary-dark: #7DBCFF;
+    -primary-soft: #1D3A57;
+    -accent-teal: #51CF66;
+    -accent-amber: #F7C948;
+    -accent-red: #FF6B6B;
+    -accent-deep-red: #FF8787;
+    -text-main: #E5EDF5;
+    -text-soft: #A8B5C2;
+    -text-muted: #718093;
+    -hover-bg: #1B2735;
+    -input-bg: #0D141D;
+    -column-header-bg: #182535;
+    -column-header-fg: #C7D8E8;
+    -banner-info-bg: #182535;    -banner-info-bd: -border-strong;
+    -banner-success-bg: #17301F; -banner-success-bd: #2F5C3B;
+    -banner-warning-bg: #332A11; -banner-warning-bd: #5C4C1E;
+    -banner-danger-bg: #3A1E1E;  -banner-danger-bd: #5C2E2E;
+
+    -tag-key-bg: rgba(77, 163, 255, 0.16);   -tag-key-fg: #9EC6E8;   -tag-key-bd: rgba(77, 163, 255, 0.4);
+    -tag-nokey-bg: #1B2735;                  -tag-nokey-fg: #A8B5C2; -tag-nokey-bd: #2C3B4D;
+    -tag-crack-bg: rgba(255, 107, 107, 0.16); -tag-crack-fg: #FF9B9B; -tag-crack-bd: rgba(255, 107, 107, 0.4);
+    -tag-nocrack-bg: rgba(81, 207, 102, 0.16); -tag-nocrack-fg: #8BE89D; -tag-nocrack-bd: rgba(81, 207, 102, 0.4);
+    -tag-energy-bg: rgba(247, 201, 72, 0.16); -tag-energy-fg: #FFD873; -tag-energy-bd: rgba(247, 201, 72, 0.4);
+    -tag-risk-bg: rgba(255, 107, 107, 0.22);  -tag-risk-fg: #FFB3B3;  -tag-risk-bd: rgba(255, 107, 107, 0.55);
+    -tag-done-bg: rgba(81, 207, 102, 0.16);   -tag-done-fg: #8BE89D;  -tag-done-bd: rgba(81, 207, 102, 0.4);
 }
 
 /* ---- monospace / tabular numeric values (params, energy values, timestamps, logs) ---- */
@@ -81,7 +125,7 @@
     -fx-border-color: -border-strong;
     -fx-border-width: 1px;
 }
-.btn-secondary:hover { -fx-background-color: #F2F5F7; }
+.btn-secondary:hover { -fx-background-color: -hover-bg; }
 .btn-ghost {
     -fx-background-color: transparent;
     -fx-text-fill: -text-soft;
@@ -116,10 +160,10 @@
     -fx-border-width: 1px 1px 1px 3px;
     -fx-padding: 11px 12px;
 }
-.banner-info    { -fx-background-color: #F7F9FA; -fx-border-color: -border -border -border -border-strong; -fx-text-fill: -text-soft; }
-.banner-success { -fx-background-color: derive(-accent-teal, 92%); -fx-border-color: #BFDCD6 #BFDCD6 #BFDCD6 -accent-teal; }
-.banner-warning { -fx-background-color: #FDF7E9; -fx-border-color: #ECD7A4 #ECD7A4 #ECD7A4 -accent-amber; }
-.banner-danger  { -fx-background-color: #FDF1EC; -fx-border-color: #EECFC4 #EECFC4 #EECFC4 -accent-red; }
+.banner-info    { -fx-background-color: -banner-info-bg;    -fx-border-color: -banner-info-bd -banner-info-bd -banner-info-bd -border-strong;       -fx-text-fill: -text-soft; }
+.banner-success { -fx-background-color: -banner-success-bg; -fx-border-color: -banner-success-bd -banner-success-bd -banner-success-bd -accent-teal; }
+.banner-warning { -fx-background-color: -banner-warning-bg; -fx-border-color: -banner-warning-bd -banner-warning-bd -banner-warning-bd -accent-amber; }
+.banner-danger  { -fx-background-color: -banner-danger-bg;  -fx-border-color: -banner-danger-bd -banner-danger-bd -banner-danger-bd -accent-red; }
 
 /* ---- 5. Status tags / badges ---- */
 .tag {
@@ -165,9 +209,9 @@
 
 /* ---- 8. Table ---- */
 .table-view { -fx-background-color: -panel-white; -fx-border-color: -border; }
-.table-view .column-header-background { -fx-background-color: #F7F9FA; }
+.table-view .column-header-background { -fx-background-color: -column-header-bg; }
 .table-view .column-header { -fx-border-color: transparent -border transparent transparent; }
-.table-view .column-header .label { -fx-text-fill: #3F4C58; -fx-font-weight: bold; -fx-font-size: 11.5px; }
+.table-view .column-header .label { -fx-text-fill: -column-header-fg; -fx-font-weight: bold; -fx-font-size: 11.5px; }
 .table-row-cell { -fx-border-color: transparent transparent -divider transparent; }
 .table-row-cell:odd { -fx-background-color: -panel-soft; }
 .table-row-cell:selected { -fx-background-color: -primary-soft; }
@@ -183,6 +227,26 @@
     -fx-background-color: -text-main; -fx-text-fill: white; -fx-background-radius: 6px;
     -fx-padding: 4px 7px; -fx-font-size: 12px; -fx-font-weight: 600;
 }
+
+/* ---- 12. Native controls (text field, menu bar, scroll bar) ---- */
+.text-field, .text-area {
+    -fx-background-color: -input-bg;
+    -fx-text-fill: -text-main;
+    -fx-prompt-text-fill: -text-muted;
+    -fx-border-color: -border-strong;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
+}
+.menu-bar { -fx-background-color: -panel-white; -fx-border-color: transparent transparent -border transparent; -fx-border-width: 1px; }
+.menu-bar .label { -fx-text-fill: -text-main; }
+.menu-item .label { -fx-text-fill: -text-main; }
+.menu-item:focused { -fx-background-color: -primary-soft; }
+.menu, .context-menu { -fx-background-color: -panel-white; -fx-border-color: -border; }
+.scroll-bar { -fx-background-color: transparent; }
+.scroll-bar .thumb { -fx-background-color: -border-strong; -fx-background-radius: 5px; }
+.scroll-bar .track { -fx-background-color: transparent; }
+.split-pane { -fx-background-color: transparent; }
+.split-pane-divider { -fx-background-color: -border; }
 
 /* ---- 11. Rock profile pane ---- */
 .profile-bar { -fx-cursor: hand; }

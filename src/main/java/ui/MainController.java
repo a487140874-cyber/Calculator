@@ -41,6 +41,7 @@ import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
@@ -103,11 +104,15 @@ public class MainController {
     @FXML private Pane visualizationPane;
     @FXML private Label statusLabel;
 
+    @FXML private BorderPane rootPane;
     @FXML private Button importButton;
+    @FXML private Button themeToggleButton;
     @FXML private javafx.scene.control.MenuButton exportButton;
     @FXML private MenuItem exportImageMenuItem;
     @FXML private MenuItem importMenuItem;
     @FXML private MenuItem exportMenuItem;
+
+    private boolean darkTheme = false;
 
     @FXML private Label fileNameLabel;
     @FXML private Label fileBadgeLabel;
@@ -1160,7 +1165,7 @@ public class MainController {
 
             if (layer.isKeyLayer() && !layer.isNotCrack()) {
                 Line fracture = new Line(0, currentY + layerHeight / 2.0, paneWidth, currentY + layerHeight / 2.0);
-                fracture.setStroke(Color.web("#C0492E"));
+                fracture.setStyle("-fx-stroke: -accent-red;");
                 fracture.getStrokeDashArray().addAll(4d, 3d);
                 fracture.setMouseTransparent(true);
                 visualizationPane.getChildren().add(fracture);
@@ -1408,5 +1413,16 @@ public class MainController {
     @FXML
     private void handleExit() {
         ((Stage) dataTable.getScene().getWindow()).close();
+    }
+
+    @FXML
+    private void handleToggleTheme() {
+        darkTheme = !darkTheme;
+        if (darkTheme) {
+            rootPane.getStyleClass().add("theme-dark");
+        } else {
+            rootPane.getStyleClass().remove("theme-dark");
+        }
+        themeToggleButton.setText(darkTheme ? "浅色模式" : "深色模式");
     }
 }

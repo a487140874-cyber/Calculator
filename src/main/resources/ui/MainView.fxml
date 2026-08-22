@@ -4,7 +4,7 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx/11.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.MainController">
+<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/11.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.MainController">
     <top>
         <VBox>
             <MenuBar>
@@ -24,6 +24,7 @@
                 <Label fx:id="fileNameLabel" styleClass="text-body" text="未打开文件" />
                 <Label fx:id="fileBadgeLabel" styleClass="tag, tag-nokey" text="等待导入" />
                 <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="themeToggleButton" styleClass="btn-ghost" onAction="#handleToggleTheme" text="深色模式" />
                 <Button fx:id="importButton" styleClass="btn-primary" onAction="#handleImportExcel" text="导入数据" />
                 <MenuButton fx:id="exportButton" styleClass="btn-secondary" text="导出结果">
                     <items>
@@ -55,7 +56,7 @@
                                 </Label>
                                 <ScrollPane fx:id="scrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS" style="-fx-background: transparent; -fx-background-color: transparent;">
                                     <content>
-                                        <Pane fx:id="visualizationPane" prefHeight="600.0" style="-fx-background-color: white;" />
+                                        <Pane fx:id="visualizationPane" prefHeight="600.0" style="-fx-background-color: -panel-white;" />
                                     </content>
                                 </ScrollPane>
                             </VBox>
