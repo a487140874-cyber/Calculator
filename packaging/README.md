@@ -36,8 +36,10 @@ Output: `dist\windows-x64\Calculator-1.0.0.exe`
 
 ## 3D feature
 
-The 3D layer view is rendered natively with JavaFX (`SubScene` + `PerspectiveCamera`,
-no external process). No Python installation is required for any feature.
+Java and JavaFX are bundled. The current 3D renderer still requires a Python 3
+installation containing NumPy and Matplotlib. Set `PYTHON_EXECUTABLE` when Python is
+installed in a non-standard location. Import, calculation, Excel export, and energy-image
+export do not require Python.
 
 ## CI builds
 
