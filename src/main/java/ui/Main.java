@@ -15,7 +15,9 @@ public class Main extends Application {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("MainView.fxml"));
         Parent root = loader.load();
         primaryStage.setTitle("Geological Key Layer Calculator");
-        primaryStage.setScene(new Scene(root, 1200, 800));
+        Scene scene = new Scene(root, 1360, 860);
+        scene.getStylesheets().add(getClass().getResource("app.css").toExternalForm());
+        primaryStage.setScene(scene);
         primaryStage.show();
     }
 
