@@ -11,6 +11,7 @@ import geModel.GeDataModelExcel;
 import geModel.GeDataModelMapper;
 import getData.GetDateFromExcle;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -125,7 +126,7 @@ public class MainController {
 
     private final List<String[]> activityLog = new ArrayList<>();
 
-    private static final double THREE_D_HEIGHT_SCALE = 6.0;
+    private static final double THREE_D_TARGET_SIZE = 700.0;
 
     private final Group threeDRoot = new Group();
     private final Group threeDContentGroup = new Group();
@@ -138,7 +139,7 @@ public class MainController {
     private Label threeDEmptyLabel;
     private double threeDMouseOldX;
     private double threeDMouseOldY;
-    private double threeDStackHeight = 800;
+    private double threeDSceneExtent = 800;
 
     private static final String[] TABLE_FILTERS = {"全部", "关键层", "已垮落", "未垮落", "能量聚集"};
     private String activeTableFilter = TABLE_FILTERS[0];
@@ -180,8 +181,8 @@ public class MainController {
         lCol.setCellValueFactory(new PropertyValueFactory<>("l"));
         eCol.setCellValueFactory(new PropertyValueFactory<>("e"));
         rCol.setCellValueFactory(new PropertyValueFactory<>("r"));
-        isKeyLayerCol.setCellValueFactory(new PropertyValueFactory<>("isKeyLayer"));
-        isNotCrackCol.setCellValueFactory(new PropertyValueFactory<>("isNotCrack"));
+        isKeyLayerCol.setCellValueFactory(data -> new SimpleBooleanProperty(data.getValue().isKeyLayer()).asObject());
+        isNotCrackCol.setCellValueFactory(data -> new SimpleBooleanProperty(data.getValue().isNotCrack()).asObject());
         lastAiCol.setCellValueFactory(new PropertyValueFactory<>("lastAi"));
 
         hCol.setCellFactory(col -> numericCell(1));
@@ -919,14 +920,24 @@ public class MainController {
                 .filter(java.util.Objects::nonNull)
                 .mapToDouble(BigDecimal::doubleValue)
                 .sum();
-        double footprintX = dims != null ? dims[0].doubleValue() * THREE_D_HEIGHT_SCALE
-                : Math.max(200, totalThickness * THREE_D_HEIGHT_SCALE * 0.6);
-        double footprintZ = dims != null ? dims[1].doubleValue() * THREE_D_HEIGHT_SCALE : footprintX * 0.8;
+        double rawFootprintX = dims != null ? dims[0].doubleValue() : Math.max(1.0, totalThickness * 0.9);
+        double rawFootprintZ = dims != null ? dims[1].doubleValue() : rawFootprintX * 0.8;
+
+        // Layer thickness/ax/by come straight from user-supplied Excel data with no
+        // guaranteed unit or magnitude; normalize the largest raw dimension to a fixed
+        // on-screen target instead of applying a constant multiplier, which previously
+        // let a single outlier value blow past the GPU's max texture size.
+        double maxRawDimension = Math.max(Math.max(totalThickness, rawFootprintX), rawFootprintZ);
+        double scale = maxRawDimension > 0
+                ? Math.max(0.01, Math.min(5000, THREE_D_TARGET_SIZE / maxRawDimension))
+                : 1.0;
+        double footprintX = Math.max(60, rawFootprintX * scale);
+        double footprintZ = Math.max(60, rawFootprintZ * scale);
 
         double currentY = 0;
         for (GeDataModel layer : geDataModels) {
             double thickness = layer.getH() == null ? 1.0 : Math.max(0.3, layer.getH().doubleValue());
-            double boxHeight = thickness * THREE_D_HEIGHT_SCALE;
+            double boxHeight = Math.max(4, thickness * scale);
 
             Box box = new Box(footprintX, boxHeight, footprintZ);
             box.setTranslateY(currentY + boxHeight / 2);
@@ -946,7 +957,7 @@ public class MainController {
         }
 
         threeDContentGroup.setTranslateY(-currentY / 2.0);
-        threeDStackHeight = currentY;
+        threeDSceneExtent = Math.max(currentY, Math.max(footprintX, footprintZ));
         applyThreeDDefaultCamera();
         refreshThreeDSelection();
     }
@@ -968,7 +979,7 @@ public class MainController {
     private void applyThreeDDefaultCamera() {
         threeDRotateY.setAngle(-35);
         threeDRotateX.setAngle(-20);
-        threeDTranslate.setZ(-Math.max(400, threeDStackHeight * 2.4));
+        threeDTranslate.setZ(-Math.max(400, threeDSceneExtent * 1.8));
     }
 
     private void resetThreeDCamera() {
