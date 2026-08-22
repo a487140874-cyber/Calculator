@@ -6,9 +6,6 @@ import com.alibaba.excel.write.metadata.WriteSheet;
 import com.example.calculator.EnergyCalculator;
 import com.example.calculator.KeyLayerAnalyzer;
 import com.example.calculator.LayerLoadCalculator;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.util.Duration;
 import geModel.GeDataModel;
 import geModel.GeDataModelExcel;
 import geModel.GeDataModelMapper;
@@ -22,16 +19,22 @@ import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.AmbientLight;
+import javafx.scene.Group;
 import javafx.scene.Node;
+import javafx.scene.PerspectiveCamera;
+import javafx.scene.PointLight;
+import javafx.scene.SceneAntialiasing;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.SubScene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
-import javafx.geometry.Insets;
-import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Tab;
@@ -39,36 +42,34 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.PhongMaterial;
+import javafx.scene.shape.Box;
 import javafx.scene.shape.Line;
+import javafx.scene.transform.Rotate;
+import javafx.scene.transform.Translate;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 
-import java.awt.Desktop;
-import java.io.BufferedReader;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -81,8 +82,6 @@ public class MainController {
     }
 
     private enum StepStatus { DONE, READY, RUNNING, LOCKED }
-
-    private record ThreeDResult(File outputFile, String processOutput) { }
 
     private static final String[] STEP_LABELS = {
             "数据导入", "关键层计算", "垮落分析", "能量分析", "三维可视化", "结果导出"
@@ -126,12 +125,20 @@ public class MainController {
 
     private final List<String[]> activityLog = new ArrayList<>();
 
-    private enum ThreeDState { IDLE, GENERATING, READY, FAILED }
-    private ThreeDState threeDState = ThreeDState.IDLE;
-    private File lastThreeDImage;
-    private String lastThreeDError;
-    private long threeDStartMillis;
-    private Timeline threeDElapsedTimeline;
+    private static final double THREE_D_HEIGHT_SCALE = 6.0;
+
+    private final Group threeDRoot = new Group();
+    private final Group threeDContentGroup = new Group();
+    private final PerspectiveCamera threeDCamera = new PerspectiveCamera(true);
+    private final Rotate threeDRotateX = new Rotate(-20, Rotate.X_AXIS);
+    private final Rotate threeDRotateY = new Rotate(-35, Rotate.Y_AXIS);
+    private final Translate threeDTranslate = new Translate(0, 0, -800);
+    private final Map<GeDataModel, Box> threeDBoxesByLayer = new IdentityHashMap<>();
+    private SubScene threeDSubScene;
+    private Label threeDEmptyLabel;
+    private double threeDMouseOldX;
+    private double threeDMouseOldY;
+    private double threeDStackHeight = 800;
 
     private static final String[] TABLE_FILTERS = {"全部", "关键层", "已垮落", "未垮落", "能量聚集"};
     private String activeTableFilter = TABLE_FILTERS[0];
@@ -193,6 +200,7 @@ public class MainController {
             refreshProfileSelection();
             syncTableSelection();
             refreshEnergyTab();
+            refreshThreeDSelection();
         });
 
         visualizationPane.widthProperty().addListener((observable, oldValue, newValue) -> {
@@ -203,6 +211,7 @@ public class MainController {
         if (searchField != null) {
             searchField.textProperty().addListener((observable, oldValue, newValue) -> applyTableFilter());
         }
+        initThreeDScene();
         refreshDetailPanel();
         refreshLogFeed();
         updateControls();
@@ -214,7 +223,7 @@ public class MainController {
         boolean exportUnavailable = workflowState.ordinal() < WorkflowState.COLLAPSE.ordinal();
         exportButton.setDisable(busy || exportUnavailable);
         exportMenuItem.setDisable(busy || exportUnavailable);
-        exportImageMenuItem.setDisable(busy || lastThreeDImage == null);
+        exportImageMenuItem.setDisable(busy || workflowState != WorkflowState.ENERGY);
 
         boolean dataLoaded = workflowState != WorkflowState.EMPTY;
         tableTab.setDisable(!dataLoaded);
@@ -226,7 +235,7 @@ public class MainController {
         refreshStatCards();
         refreshTableFilters();
         refreshEnergyTab();
-        refreshD3Tab();
+        refreshThreeDScene();
     }
 
     /* ==================== Energy analysis tab ==================== */
@@ -427,8 +436,7 @@ public class MainController {
         s[1] = activeStepIndex == 1 ? StepStatus.RUNNING : stepStatusFor(WorkflowState.IMPORTED);
         s[2] = activeStepIndex == 2 ? StepStatus.RUNNING : stepStatusFor(WorkflowState.KEY_LAYERS);
         s[3] = activeStepIndex == 3 ? StepStatus.RUNNING : stepStatusFor(WorkflowState.COLLAPSE);
-        s[4] = activeStepIndex == 4 ? StepStatus.RUNNING
-                : (workflowState.ordinal() < WorkflowState.ENERGY.ordinal() ? StepStatus.LOCKED : StepStatus.READY);
+        s[4] = workflowState.ordinal() < WorkflowState.ENERGY.ordinal() ? StepStatus.LOCKED : StepStatus.DONE;
         s[5] = activeStepIndex == 5 ? StepStatus.RUNNING
                 : (workflowState.ordinal() < WorkflowState.COLLAPSE.ordinal() ? StepStatus.LOCKED : StepStatus.READY);
         return s;
@@ -487,7 +495,7 @@ public class MainController {
             case 1 -> status == StepStatus.DONE ? "已识别关键层" : "可执行";
             case 2 -> status == StepStatus.DONE ? "已完成垮落分析" : "可执行";
             case 3 -> status == StepStatus.DONE ? "已完成能量计算" : "可执行";
-            case 4 -> "可执行";
+            case 4 -> "可交互查看三维分布";
             case 5 -> "可导出 Excel";
             default -> "";
         };
@@ -499,7 +507,7 @@ public class MainController {
             case 1 -> { if (status == StepStatus.READY) handleCalculateKeyLayers(); else selectTab(overviewTab); }
             case 2 -> { if (status == StepStatus.READY) handleCalculateCollapse(); else selectTab(overviewTab); }
             case 3 -> { if (status == StepStatus.READY) handleCalculateEnergy(); else selectTab(energyTab); }
-            case 4 -> { if (status == StepStatus.READY) handleGenerate3D(); else selectTab(d3Tab); }
+            case 4 -> selectTab(d3Tab);
             case 5 -> handleExportExcel();
             default -> { }
         }
@@ -616,10 +624,6 @@ public class MainController {
         importedFile = null;
         tableData.clear();
         selectedLayer.set(null);
-        stopThreeDElapsedTimer();
-        threeDState = ThreeDState.IDLE;
-        lastThreeDImage = null;
-        lastThreeDError = null;
         visualizationPane.getChildren().clear();
         updateControls();
     }
@@ -816,41 +820,7 @@ public class MainController {
 
     @FXML
     private void handleExportThreeDImage() {
-        if (lastThreeDImage == null || !lastThreeDImage.isFile()) {
-            showError("Image Not Ready", "Please generate the 3D layer image first.");
-            return;
-        }
-        save3DImage(lastThreeDImage);
-    }
-
-    @FXML
-    private void handleGenerate3D() {
-        if (!requireState(WorkflowState.ENERGY, "Please complete energy calculation first.")) return;
-
-        BigDecimal[] dimensions = findDimensions();
-        if (dimensions == null) {
-            showError("Missing Data", "Cannot find positive ax and by values in the data.");
-            return;
-        }
-        activeStepIndex = 4;
-        threeDState = ThreeDState.GENERATING;
-        threeDStartMillis = System.currentTimeMillis();
-        startThreeDElapsedTimer();
-        refreshD3Tab();
-        runTask(
-                "Generating 3D image...",
-                () -> generate3DImage(dimensions[0], dimensions[1]),
-                this::show3DResult,
-                "3D Generation Error",
-                this::handleThreeDFailure);
-    }
-
-    private void handleThreeDFailure(Throwable error) {
-        stopThreeDElapsedTimer();
-        threeDState = ThreeDState.FAILED;
-        lastThreeDError = readableMessage(error);
-        appendLog("三维岩层图生成失败：" + lastThreeDError);
-        refreshD3Tab();
+        exportThreeDImage();
     }
 
     private BigDecimal[] findDimensions() {
@@ -863,256 +833,176 @@ public class MainController {
         return null;
     }
 
-    private ThreeDResult generate3DImage(BigDecimal ax, BigDecimal by) throws Exception {
-        File jsonFile = Files.createTempFile("layer_data_", ".json").toFile();
-        File scriptFile = Files.createTempFile("generate_3d_layers_", ".py").toFile();
-        File outputFile = Files.createTempFile("3d_layers_", ".png").toFile();
-        if (!outputFile.delete()) throw new IOException("Unable to prepare the 3D output file.");
+    /* ==================== 3D view tab: native JavaFX scene ==================== */
 
-        try {
-            Files.writeString(jsonFile.toPath(), generateLayerDataJson(geDataModels, ax, by), StandardCharsets.UTF_8);
-            try (InputStream script = getClass().getResourceAsStream("/python/generate_3d_layers.py")) {
-                if (script == null) throw new IOException("Bundled 3D Python script was not found.");
-                Files.copy(script, scriptFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
+    private void initThreeDScene() {
+        threeDCamera.setNearClip(0.1);
+        threeDCamera.setFarClip(10000);
+        threeDCamera.getTransforms().addAll(threeDRotateY, threeDRotateX, threeDTranslate);
 
-            String python = findPythonExecutable();
-            ProcessBuilder builder = new ProcessBuilder(
-                    python, scriptFile.getAbsolutePath(), jsonFile.getAbsolutePath(), outputFile.getAbsolutePath());
-            builder.redirectErrorStream(true);
-            builder.environment().put("MPLCONFIGDIR", System.getProperty("java.io.tmpdir"));
-            builder.environment().put("XDG_CACHE_HOME", System.getProperty("java.io.tmpdir"));
-            Process process = builder.start();
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) output.append(line).append('\n');
-            }
-            int exitCode = process.waitFor();
-            if (exitCode != 0 || !outputFile.isFile()) {
-                throw new IOException("Python exited with code " + exitCode + ".\n" + output);
-            }
-            return new ThreeDResult(outputFile, output.toString());
-        } finally {
-            Files.deleteIfExists(jsonFile.toPath());
-            Files.deleteIfExists(scriptFile.toPath());
-        }
+        AmbientLight ambient = new AmbientLight(Color.web("#707070"));
+        PointLight keyLight = new PointLight(Color.WHITE);
+        keyLight.setTranslateX(-400);
+        keyLight.setTranslateY(-600);
+        keyLight.setTranslateZ(-600);
+
+        threeDRoot.getChildren().addAll(threeDCamera, ambient, keyLight, threeDContentGroup);
+
+        threeDSubScene = new SubScene(threeDRoot, 760, 520, true, SceneAntialiasing.BALANCED);
+        threeDSubScene.setFill(Color.web("#0B1420"));
+        threeDSubScene.setCamera(threeDCamera);
+
+        threeDSubScene.setOnMousePressed(event -> {
+            threeDMouseOldX = event.getSceneX();
+            threeDMouseOldY = event.getSceneY();
+        });
+        threeDSubScene.setOnMouseDragged(event -> {
+            double dx = event.getSceneX() - threeDMouseOldX;
+            double dy = event.getSceneY() - threeDMouseOldY;
+            threeDRotateY.setAngle(threeDRotateY.getAngle() + dx * 0.4);
+            threeDRotateX.setAngle(Math.max(-85, Math.min(85, threeDRotateX.getAngle() - dy * 0.4)));
+            threeDMouseOldX = event.getSceneX();
+            threeDMouseOldY = event.getSceneY();
+        });
+        threeDSubScene.setOnScroll(event -> {
+            double newZ = threeDTranslate.getZ() + event.getDeltaY() * 1.5;
+            threeDTranslate.setZ(Math.max(-6000, Math.min(-150, newZ)));
+        });
+
+        buildD3TabContent();
     }
 
-    private String findPythonExecutable() throws IOException, InterruptedException {
-        Set<String> candidates = new LinkedHashSet<>();
-        String configured = System.getenv("PYTHON_EXECUTABLE");
-        if (configured != null && !configured.isBlank()) candidates.add(configured);
-        candidates.add("python3");
-        candidates.add("/usr/bin/python3");
-        candidates.add("python");
-
-        for (String candidate : candidates) {
-            try {
-                ProcessBuilder probeBuilder = new ProcessBuilder(
-                        candidate, "-c", "import numpy, matplotlib");
-                probeBuilder.redirectErrorStream(true);
-                probeBuilder.environment().put("MPLCONFIGDIR", System.getProperty("java.io.tmpdir"));
-                probeBuilder.environment().put("XDG_CACHE_HOME", System.getProperty("java.io.tmpdir"));
-                Process probe = probeBuilder.start();
-                try (InputStream output = probe.getInputStream()) {
-                    output.transferTo(java.io.OutputStream.nullOutputStream());
-                }
-                if (probe.waitFor() == 0) return candidate;
-            } catch (IOException ignored) {
-                // Continue probing the remaining standard Python locations.
-            }
-        }
-        throw new IOException("No Python interpreter with NumPy and Matplotlib was found. "
-                + "Install the packages or set PYTHON_EXECUTABLE to a compatible Python executable.");
-    }
-
-    private void show3DResult(ThreeDResult result) {
-        stopThreeDElapsedTimer();
-        threeDState = ThreeDState.READY;
-        lastThreeDImage = result.outputFile();
-        statusLabel.setText("3D image generated successfully.");
-        appendLog("三维岩层图生成完成");
-        selectTab(d3Tab);
-        refreshD3Tab();
-    }
-
-    /* ==================== 3D view tab ==================== */
-
-    private void refreshD3Tab() {
+    private void buildD3TabContent() {
         if (d3TabBox == null) return;
         d3TabBox.getChildren().clear();
-        d3TabBox.setAlignment(Pos.CENTER);
+        d3TabBox.setAlignment(Pos.TOP_LEFT);
 
-        switch (threeDState) {
-            case GENERATING -> d3TabBox.getChildren().add(buildD3GeneratingView());
-            case FAILED -> d3TabBox.getChildren().add(buildD3FailedView());
-            case READY -> d3TabBox.getChildren().add(buildD3ReadyView());
-            default -> d3TabBox.getChildren().add(buildD3IdleView());
+        HBox toolbar = new HBox(8);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setPadding(new Insets(10, 10, 8, 10));
+        Button resetBtn = new Button("重置视角");
+        resetBtn.getStyleClass().add("btn-secondary");
+        resetBtn.setOnAction(event -> resetThreeDCamera());
+        Button exportBtn = new Button("导出图片");
+        exportBtn.getStyleClass().add("btn-secondary");
+        exportBtn.setOnAction(event -> exportThreeDImage());
+        Label hint = new Label("左键拖拽旋转 · 滚轮缩放 · 点击岩层查看详情");
+        hint.getStyleClass().add("text-caption");
+        toolbar.getChildren().addAll(resetBtn, exportBtn, hint);
+
+        threeDEmptyLabel = new Label("完成能量分析后即可查看三维视图");
+        threeDEmptyLabel.getStyleClass().add("text-soft");
+
+        StackPane sceneHost = new StackPane(threeDSubScene, threeDEmptyLabel);
+        sceneHost.getStyleClass().add("app-panel");
+        VBox.setVgrow(sceneHost, Priority.ALWAYS);
+        threeDSubScene.widthProperty().bind(sceneHost.widthProperty());
+        threeDSubScene.heightProperty().bind(sceneHost.heightProperty());
+
+        d3TabBox.getChildren().addAll(toolbar, sceneHost);
+    }
+
+    private void refreshThreeDScene() {
+        if (threeDContentGroup == null) return;
+        threeDContentGroup.getChildren().clear();
+        threeDBoxesByLayer.clear();
+
+        boolean hasData = geDataModels != null && !geDataModels.isEmpty();
+        if (threeDEmptyLabel != null) {
+            threeDEmptyLabel.setVisible(!hasData);
         }
-    }
+        if (!hasData) return;
 
-    private Node buildD3IdleView() {
-        Label hint = new Label(workflowState == WorkflowState.ENERGY
-                ? "点击下方按钮生成三维岩层图" : "完成能量分析后即可生成三维岩层图");
-        hint.getStyleClass().add("text-soft");
-        Button generate = new Button("生成三维岩层图");
-        generate.getStyleClass().add("btn-primary");
-        generate.setDisable(busy || workflowState != WorkflowState.ENERGY);
-        generate.setOnAction(event -> handleGenerate3D());
-        VBox box = new VBox(12, hint, generate);
-        box.setAlignment(Pos.CENTER);
-        return box;
-    }
+        BigDecimal[] dims = findDimensions();
+        double totalThickness = geDataModels.stream()
+                .map(GeDataModel::getH)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(BigDecimal::doubleValue)
+                .sum();
+        double footprintX = dims != null ? dims[0].doubleValue() * THREE_D_HEIGHT_SCALE
+                : Math.max(200, totalThickness * THREE_D_HEIGHT_SCALE * 0.6);
+        double footprintZ = dims != null ? dims[1].doubleValue() * THREE_D_HEIGHT_SCALE : footprintX * 0.8;
 
-    private Node buildD3GeneratingView() {
-        ProgressIndicator spinner = new ProgressIndicator();
-        spinner.setPrefSize(34, 34);
-        Label label = new Label("正在生成三维岩层图…");
-        label.getStyleClass().add("text-body");
-        Label elapsed = new Label(elapsedText());
-        elapsed.setId("d3ElapsedLabel");
-        elapsed.getStyleClass().addAll("text-caption", "mono-num");
-        VBox box = new VBox(12, spinner, label, elapsed);
-        box.setAlignment(Pos.CENTER);
-        return box;
-    }
+        double currentY = 0;
+        for (GeDataModel layer : geDataModels) {
+            double thickness = layer.getH() == null ? 1.0 : Math.max(0.3, layer.getH().doubleValue());
+            double boxHeight = thickness * THREE_D_HEIGHT_SCALE;
 
-    private Node buildD3FailedView() {
-        VBox banner = new VBox(8);
-        banner.getStyleClass().addAll("banner", "banner-danger");
-        banner.setMaxWidth(520);
-        Label title = new Label("三维岩层图生成失败");
-        title.getStyleClass().add("text-panel-head");
-        Label detail = new Label(lastThreeDError == null ? "" : lastThreeDError);
-        detail.getStyleClass().addAll("text-body", "mono-num");
-        detail.setWrapText(true);
-        Button retry = new Button("重试生成");
-        retry.getStyleClass().add("btn-primary");
-        retry.setOnAction(event -> handleGenerate3D());
-        banner.getChildren().addAll(title, detail, retry);
-        return banner;
-    }
+            Box box = new Box(footprintX, boxHeight, footprintZ);
+            box.setTranslateY(currentY + boxHeight / 2);
+            PhongMaterial material = new PhongMaterial(Color.web(colorForLayer(layer)));
+            material.setSpecularColor(Color.web("#333333"));
+            box.setMaterial(material);
+            box.setOnMouseClicked(event -> selectedLayer.set(layer));
 
-    private Node buildD3ReadyView() {
-        ImageView imageView = new ImageView(new Image(lastThreeDImage.toURI().toString()));
-        imageView.setPreserveRatio(true);
-        imageView.setFitWidth(760);
+            Tooltip tooltip = new Tooltip(layer.getNum() + "  " + safe(layer.getName())
+                    + "\n厚度 " + formatPlain(layer.getH()) + " m"
+                    + (hasPositiveEnergy(layer) ? "\n能量 " + formatPlain2(layer.getPower()) + " MJ" : ""));
+            Tooltip.install(box, tooltip);
 
-        Button openBtn = new Button("打开图片");
-        openBtn.getStyleClass().add("btn-secondary");
-        openBtn.setOnAction(event -> openFile(lastThreeDImage));
-        Button saveBtn = new Button("另存为");
-        saveBtn.getStyleClass().add("btn-secondary");
-        saveBtn.setOnAction(event -> save3DImage(lastThreeDImage));
-        Button regenBtn = new Button("重新生成");
-        regenBtn.getStyleClass().add("btn-primary");
-        regenBtn.setDisable(busy);
-        regenBtn.setOnAction(event -> handleGenerate3D());
-        HBox actions = new HBox(8, openBtn, saveBtn, regenBtn);
-        actions.setAlignment(Pos.CENTER);
-
-        VBox box = new VBox(12, imageView, actions);
-        box.setAlignment(Pos.CENTER);
-        ScrollPane scroll = new ScrollPane(box);
-        scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
-        return scroll;
-    }
-
-    private void startThreeDElapsedTimer() {
-        stopThreeDElapsedTimer();
-        threeDElapsedTimeline = new Timeline(new KeyFrame(Duration.seconds(1), event -> updateThreeDElapsedLabel()));
-        threeDElapsedTimeline.setCycleCount(Timeline.INDEFINITE);
-        threeDElapsedTimeline.play();
-    }
-
-    private void stopThreeDElapsedTimer() {
-        if (threeDElapsedTimeline != null) {
-            threeDElapsedTimeline.stop();
-            threeDElapsedTimeline = null;
+            threeDContentGroup.getChildren().add(box);
+            threeDBoxesByLayer.put(layer, box);
+            currentY += boxHeight;
         }
+
+        threeDContentGroup.setTranslateY(-currentY / 2.0);
+        threeDStackHeight = currentY;
+        applyThreeDDefaultCamera();
+        refreshThreeDSelection();
     }
 
-    private void updateThreeDElapsedLabel() {
-        if (d3TabBox == null) return;
-        Node node = d3TabBox.lookup("#d3ElapsedLabel");
-        if (node instanceof Label label) {
-            label.setText(elapsedText());
+    private void refreshThreeDSelection() {
+        GeDataModel selected = selectedLayer.get();
+        threeDBoxesByLayer.forEach((layer, box) -> {
+            PhongMaterial material = (PhongMaterial) box.getMaterial();
+            if (layer == selected) {
+                material.setDiffuseColor(Color.web("#FFD166"));
+                material.setSpecularColor(Color.WHITE);
+            } else {
+                material.setDiffuseColor(Color.web(colorForLayer(layer)));
+                material.setSpecularColor(Color.web("#333333"));
+            }
+        });
+    }
+
+    private void applyThreeDDefaultCamera() {
+        threeDRotateY.setAngle(-35);
+        threeDRotateX.setAngle(-20);
+        threeDTranslate.setZ(-Math.max(400, threeDStackHeight * 2.4));
+    }
+
+    private void resetThreeDCamera() {
+        applyThreeDDefaultCamera();
+    }
+
+    private void exportThreeDImage() {
+        if (threeDBoxesByLayer.isEmpty()) {
+            showError("Image Not Ready", "Please complete energy calculation first.");
+            return;
         }
-    }
-
-    private String elapsedText() {
-        double seconds = (System.currentTimeMillis() - threeDStartMillis) / 1000.0;
-        return String.format("已用 %.1f s", seconds);
-    }
-
-    private void openFile(File file) {
-        try {
-            if (!Desktop.isDesktopSupported()) throw new IOException("Desktop file opening is not supported.");
-            Desktop.getDesktop().open(file);
-        } catch (Exception e) {
-            showError("Open Error", "Could not open the image file: " + readableMessage(e));
-        }
-    }
-
-    private void save3DImage(File source) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Save 3D Image");
+        chooser.setTitle("Export 3D Image");
         chooser.setInitialFileName("3d-layers.png");
         chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("PNG Image", "*.png"));
-        File destination = chooser.showSaveDialog(dataTable.getScene().getWindow());
-        if (destination == null) return;
+        File file = chooser.showSaveDialog(dataTable.getScene().getWindow());
+        if (file == null) return;
         try {
-            Files.copy(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            statusLabel.setText("3D image saved to " + destination.getName() + ".");
-        } catch (IOException e) {
-            showError("Save Error", "Could not save the image: " + readableMessage(e));
-        }
-    }
-
-    private String generateLayerDataJson(List<GeDataModel> layers, BigDecimal ax, BigDecimal by) {
-        StringBuilder json = new StringBuilder("{\n");
-        json.append("  \"ax\": ").append(ax.toPlainString()).append(",\n");
-        json.append("  \"by\": ").append(by.toPlainString()).append(",\n  \"layers\": [\n");
-        for (int i = 0; i < layers.size(); i++) {
-            GeDataModel layer = layers.get(i);
-            if (layer.getH() == null || layer.getH().signum() <= 0) {
-                throw new IllegalArgumentException("Layer " + layer.getNum() + " has an invalid thickness.");
-            }
-            String name = layer.getName() == null ? "Layer " + layer.getNum() : layer.getName();
-            json.append("    {\"name\": \"").append(escapeJson(name)).append("\", ")
-                    .append("\"h\": ").append(layer.getH().toPlainString()).append(", ")
-                    .append("\"num\": ").append(layer.getNum());
-            if (hasPositiveEnergy(layer)) {
-                json.append(", \"power\": ").append(layer.getPower().toPlainString());
-            }
-            json.append("}");
-            if (i < layers.size() - 1) json.append(',');
-            json.append('\n');
-        }
-        return json.append("  ]\n}\n").toString();
-    }
-
-    private String escapeJson(String value) {
-        StringBuilder escaped = new StringBuilder();
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"' -> escaped.append("\\\"");
-                case '\\' -> escaped.append("\\\\");
-                case '\b' -> escaped.append("\\b");
-                case '\f' -> escaped.append("\\f");
-                case '\n' -> escaped.append("\\n");
-                case '\r' -> escaped.append("\\r");
-                case '\t' -> escaped.append("\\t");
-                default -> {
-                    if (c < 0x20) escaped.append(String.format("\\u%04x", (int) c));
-                    else escaped.append(c);
+            WritableImage image = threeDSubScene.snapshot(new SnapshotParameters(), null);
+            BufferedImage bufferedImage = new BufferedImage(
+                    (int) image.getWidth(), (int) image.getHeight(), BufferedImage.TYPE_INT_ARGB);
+            for (int y = 0; y < bufferedImage.getHeight(); y++) {
+                for (int x = 0; x < bufferedImage.getWidth(); x++) {
+                    bufferedImage.setRGB(x, y, image.getPixelReader().getArgb(x, y));
                 }
             }
+            if (!ImageIO.write(bufferedImage, "png", file)) {
+                throw new IOException("No PNG writer is available.");
+            }
+            statusLabel.setText("3D image saved to " + file.getName() + ".");
+            appendLog("导出三维视图截图 " + file.getName());
+        } catch (IOException e) {
+            showError("Export Error", "Could not export the image: " + readableMessage(e));
         }
-        return escaped.toString();
     }
 
     private boolean hasPositiveEnergy(GeDataModel layer) {
