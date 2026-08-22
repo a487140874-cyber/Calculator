@@ -837,8 +837,12 @@ public class MainController {
     /* ==================== 3D view tab: native JavaFX scene ==================== */
 
     private void initThreeDScene() {
-        threeDCamera.setNearClip(0.1);
-        threeDCamera.setFarClip(10000);
+        // near/far kept to a tight ratio (content is normalized to within a few hundred
+        // units, see refreshThreeDScene) rather than an arbitrary wide range, since a
+        // large near-to-far ratio combined with camera zoom is a known trigger for
+        // depth-buffer/MSAA render-target sizing blowups in JavaFX's Prism pipeline.
+        threeDCamera.setNearClip(1);
+        threeDCamera.setFarClip(4000);
         threeDCamera.getTransforms().addAll(threeDRotateY, threeDRotateX, threeDTranslate);
 
         AmbientLight ambient = new AmbientLight(Color.web("#707070"));
@@ -849,7 +853,12 @@ public class MainController {
 
         threeDRoot.getChildren().addAll(threeDCamera, ambient, keyLight, threeDContentGroup);
 
-        threeDSubScene = new SubScene(threeDRoot, 760, 520, true, SceneAntialiasing.BALANCED);
+        // MSAA (BALANCED) allocates an auxiliary resolve texture sized off the render
+        // target; that's the exact code path implicated in the observed
+        // "Requested texture dimensions ... exceed maximum texture size" crash
+        // (NGSubScene.renderContent -> ES2ResourceFactory.createRTTexture). Disabled
+        // rather than chasing the precise trigger further.
+        threeDSubScene = new SubScene(threeDRoot, 760, 520, true, SceneAntialiasing.DISABLED);
         threeDSubScene.setFill(Color.web("#0B1420"));
         threeDSubScene.setCamera(threeDCamera);
 
@@ -867,7 +876,8 @@ public class MainController {
         });
         threeDSubScene.setOnScroll(event -> {
             double newZ = threeDTranslate.getZ() + event.getDeltaY() * 1.5;
-            threeDTranslate.setZ(Math.max(-6000, Math.min(-150, newZ)));
+            double minDistance = -Math.max(150, threeDSceneExtent * 0.3);
+            threeDTranslate.setZ(Math.max(-4000, Math.min(minDistance, newZ)));
         });
 
         buildD3TabContent();
@@ -896,6 +906,15 @@ public class MainController {
 
         StackPane sceneHost = new StackPane(threeDSubScene, threeDEmptyLabel);
         sceneHost.getStyleClass().add("app-panel");
+        // StackPane's default preferred size is computed from its children; since the
+        // SubScene's own width/height are bound back to sceneHost, leaving that default
+        // in place creates a circular layout dependency that drifts upward every pulse
+        // (observed as a runaway "Requested texture dimensions" crash). Pinning sceneHost
+        // to a small, non-computed preferred size breaks the cycle; vgrow still expands
+        // it to fill the available space.
+        sceneHost.setMinSize(0, 0);
+        sceneHost.setPrefSize(1, 1);
+        sceneHost.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         VBox.setVgrow(sceneHost, Priority.ALWAYS);
         threeDSubScene.widthProperty().bind(sceneHost.widthProperty());
         threeDSubScene.heightProperty().bind(sceneHost.heightProperty());
