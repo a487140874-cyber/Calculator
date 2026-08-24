@@ -35,8 +35,6 @@ import javafx.geometry.Insets;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
-import javafx.scene.control.Tab;
-import javafx.scene.control.TabPane;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -84,6 +82,15 @@ public class MainController {
 
     private enum StepStatus { DONE, READY, RUNNING, LOCKED }
 
+    /** The center viewer shows one of these at a time; the pill row above it switches between them. */
+    private enum ViewMode {
+        PROFILE("岩层剖面"), ENERGY("能量分析"), THREE_D("三维视图");
+
+        private final String label;
+
+        ViewMode(String label) { this.label = label; }
+    }
+
     private record ThreeDResult(File outputFile, String processOutput) { }
 
     private static final String[] STEP_LABELS = {
@@ -112,16 +119,17 @@ public class MainController {
     @FXML private MenuItem importMenuItem;
     @FXML private MenuItem exportMenuItem;
 
-    private boolean darkTheme = false;
+    private boolean darkTheme = true;
 
     @FXML private Label fileNameLabel;
     @FXML private Label fileBadgeLabel;
     @FXML private VBox stepNav;
-    @FXML private TabPane workTabs;
-    @FXML private Tab overviewTab;
-    @FXML private Tab tableTab;
-    @FXML private Tab energyTab;
-    @FXML private Tab d3Tab;
+    @FXML private HBox viewPillsBox;
+    @FXML private StackPane viewerStack;
+    @FXML private VBox profileViewBox;
+    @FXML private Label scaleInfoLabel;
+    @FXML private Button exportExcelButton;
+    @FXML private Button exportImageButton;
     @FXML private HBox statCardsBox;
     @FXML private VBox detailPanel;
     @FXML private VBox overviewSideBox;
@@ -143,18 +151,18 @@ public class MainController {
     private String activeTableFilter = TABLE_FILTERS[0];
 
     private static final Map<String, String> LITHOLOGY_COLORS = Map.ofEntries(
-            Map.entry("泥岩", "#A79F95"),
-            Map.entry("砂质泥岩", "#B9B2A4"),
-            Map.entry("细砂岩", "#CDC5AE"),
-            Map.entry("中砂岩", "#C0B18F"),
-            Map.entry("粗砂岩", "#B7A97C"),
-            Map.entry("石灰岩", "#9DA8A8"),
-            Map.entry("砂岩", "#C49A5A"),
-            Map.entry("页岩", "#556B7A"),
-            Map.entry("煤层", "#3A3A3D"),
-            Map.entry("煤", "#3A3A3D")
+            Map.entry("泥岩", "#7D7468"),
+            Map.entry("砂质泥岩", "#A38C6C"),
+            Map.entry("细砂岩", "#E0CE96"),
+            Map.entry("中砂岩", "#D2A03F"),
+            Map.entry("粗砂岩", "#96562B"),
+            Map.entry("石灰岩", "#74A6B8"),
+            Map.entry("砂岩", "#D9A06B"),
+            Map.entry("页岩", "#4A6A85"),
+            Map.entry("煤层", "#2E2E33"),
+            Map.entry("煤", "#2E2E33")
     );
-    private static final String DEFAULT_LITHOLOGY_COLOR = "#C8D1DA";
+    private static final String DEFAULT_LITHOLOGY_COLOR = "#C2CBD4";
 
     private List<GeDataModel> geDataModels;
     private final ObservableList<GeDataModel> tableData = FXCollections.observableArrayList();
@@ -162,6 +170,7 @@ public class MainController {
     private final ObjectProperty<GeDataModel> selectedLayer = new SimpleObjectProperty<>();
     private final Map<GeDataModel, Region> profileBarsByLayer = new IdentityHashMap<>();
     private WorkflowState workflowState = WorkflowState.EMPTY;
+    private ViewMode viewMode = ViewMode.PROFILE;
     private boolean busy;
     private int activeStepIndex = -1;
     private File importedFile;
@@ -209,6 +218,9 @@ public class MainController {
         if (searchField != null) {
             searchField.textProperty().addListener((observable, oldValue, newValue) -> applyTableFilter());
         }
+        rootPane.getStyleClass().add("theme-dark");
+        themeToggleButton.setText("浅色模式");
+
         refreshDetailPanel();
         refreshLogFeed();
         updateControls();
@@ -221,11 +233,11 @@ public class MainController {
         exportButton.setDisable(busy || exportUnavailable);
         exportMenuItem.setDisable(busy || exportUnavailable);
         exportImageMenuItem.setDisable(busy || lastThreeDImage == null);
+        if (exportExcelButton != null) exportExcelButton.setDisable(busy || exportUnavailable);
+        if (exportImageButton != null) exportImageButton.setDisable(busy || lastThreeDImage == null);
 
-        boolean dataLoaded = workflowState != WorkflowState.EMPTY;
-        tableTab.setDisable(!dataLoaded);
-        energyTab.setDisable(workflowState.ordinal() < WorkflowState.ENERGY.ordinal());
-        d3Tab.setDisable(workflowState != WorkflowState.ENERGY);
+        // The selected view may have become unavailable (e.g. after resetData).
+        if (!viewAvailable(viewMode)) viewMode = ViewMode.PROFILE;
 
         updateFileBadge();
         refreshStepNav();
@@ -233,6 +245,9 @@ public class MainController {
         refreshTableFilters();
         refreshEnergyTab();
         refreshD3Tab();
+        refreshViewPills();
+        applyViewMode();
+        refreshScaleInfo();
     }
 
     /* ==================== Energy analysis tab ==================== */
@@ -466,6 +481,8 @@ public class MainController {
         Label note = new Label(noteFor(index, status));
         note.getStyleClass().add("text-caption");
         note.setWrapText(true);
+        note.setMinHeight(Region.USE_PREF_SIZE);
+        note.setMaxWidth(190);
         VBox textBox = new VBox(2, label, note);
 
         cell.getChildren().addAll(mark, textBox);
@@ -502,19 +519,93 @@ public class MainController {
     private void onStepClicked(int index, StepStatus status) {
         switch (index) {
             case 0 -> handleImportExcel();
-            case 1 -> { if (status == StepStatus.READY) handleCalculateKeyLayers(); else selectTab(overviewTab); }
-            case 2 -> { if (status == StepStatus.READY) handleCalculateCollapse(); else selectTab(overviewTab); }
-            case 3 -> { if (status == StepStatus.READY) handleCalculateEnergy(); else selectTab(energyTab); }
-            case 4 -> { if (status == StepStatus.READY) handleGenerate3D(); else selectTab(d3Tab); }
+            case 1 -> { if (status == StepStatus.READY) handleCalculateKeyLayers(); else selectView(ViewMode.PROFILE); }
+            case 2 -> { if (status == StepStatus.READY) handleCalculateCollapse(); else selectView(ViewMode.PROFILE); }
+            case 3 -> { if (status == StepStatus.READY) handleCalculateEnergy(); else selectView(ViewMode.ENERGY); }
+            case 4 -> { if (status == StepStatus.READY) handleGenerate3D(); else selectView(ViewMode.THREE_D); }
             case 5 -> handleExportExcel();
             default -> { }
         }
     }
 
-    private void selectTab(Tab tab) {
-        if (tab != null && !tab.isDisable()) {
-            workTabs.getSelectionModel().select(tab);
+    /* ==================== Center viewer switcher ==================== */
+
+    private boolean viewAvailable(ViewMode mode) {
+        return switch (mode) {
+            case PROFILE -> true;
+            case ENERGY -> workflowState.ordinal() >= WorkflowState.ENERGY.ordinal();
+            case THREE_D -> workflowState == WorkflowState.ENERGY;
+        };
+    }
+
+    private void selectView(ViewMode mode) {
+        if (!viewAvailable(mode)) return;
+        viewMode = mode;
+        refreshViewPills();
+        applyViewMode();
+        refreshScaleInfo();
+    }
+
+    private void applyViewMode() {
+        if (viewerStack == null) return;
+        setViewVisible(profileViewBox, viewMode == ViewMode.PROFILE);
+        setViewVisible(energyTabBox, viewMode == ViewMode.ENERGY);
+        setViewVisible(d3TabBox, viewMode == ViewMode.THREE_D);
+    }
+
+    private void setViewVisible(Node node, boolean visible) {
+        if (node == null) return;
+        node.setVisible(visible);
+        node.setManaged(visible);
+    }
+
+    private void refreshViewPills() {
+        if (viewPillsBox == null) return;
+        viewPillsBox.getChildren().clear();
+        for (ViewMode mode : ViewMode.values()) {
+            Button pill = new Button(mode.label);
+            pill.getStyleClass().add("view-pill");
+            if (mode == viewMode) {
+                pill.getStyleClass().add("view-pill-active");
+            }
+            pill.setDisable(!viewAvailable(mode));
+            pill.setOnAction(event -> selectView(mode));
+            viewPillsBox.getChildren().add(pill);
         }
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label hint = new Label(switch (viewMode) {
+            case PROFILE -> "点击色块选中岩层";
+            case ENERGY -> "按弹性能大小排序";
+            case THREE_D -> "由 Python 渲染的静态三维图";
+        });
+        hint.getStyleClass().add("text-caption");
+        viewPillsBox.getChildren().addAll(spacer, hint);
+    }
+
+    /** Dimension / scale readout floating over the viewer, mirroring the prototype's scale box. */
+    private void refreshScaleInfo() {
+        if (scaleInfoLabel == null) return;
+        if (geDataModels == null || geDataModels.isEmpty() || viewMode != ViewMode.PROFILE) {
+            setViewVisible(scaleInfoLabel, false);
+            return;
+        }
+        BigDecimal totalThickness = BigDecimal.ZERO;
+        for (GeDataModel layer : geDataModels) {
+            if (layer.getH() != null) totalThickness = totalThickness.add(layer.getH());
+        }
+        BigDecimal[] dimensions = findDimensions();
+        StringBuilder text = new StringBuilder();
+        text.append("岩层数：").append(geDataModels.size()).append(" 层\n");
+        text.append("总厚度：").append(formatPlain(totalThickness)).append(" m\n");
+        if (dimensions != null) {
+            text.append("推进距离 ax：").append(formatPlain(dimensions[0]))
+                    .append(" m　剖面宽度 by：").append(formatPlain(dimensions[1])).append(" m");
+        } else {
+            text.append("推进距离 ax / 剖面宽度 by：数据中未提供");
+        }
+        scaleInfoLabel.setText(text.toString());
+        setViewVisible(scaleInfoLabel, true);
     }
 
     /* ==================== Operations / data-quality log ==================== */
@@ -530,14 +621,12 @@ public class MainController {
 
     private void refreshLogFeed() {
         if (overviewSideBox == null) return;
-        Label heading = new Label("操作与数据质量记录");
-        heading.getStyleClass().add("text-panel-head");
-
         VBox list = new VBox(2);
         for (String[] entry : activityLog) {
             Label msg = new Label(entry[1]);
             msg.getStyleClass().add("text-body");
             msg.setWrapText(true);
+            msg.setMinHeight(Region.USE_PREF_SIZE);
             Label time = new Label(entry[0]);
             time.getStyleClass().addAll("text-caption", "mono-num");
             VBox row = new VBox(2, msg, time);
@@ -555,12 +644,7 @@ public class MainController {
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
         VBox.setVgrow(scroll, Priority.ALWAYS);
-
-        VBox wrapper = new VBox(8, heading, scroll);
-        wrapper.getStyleClass().add("app-panel");
-        wrapper.setPadding(new Insets(10));
-        VBox.setVgrow(wrapper, Priority.ALWAYS);
-        overviewSideBox.getChildren().setAll(wrapper);
+        overviewSideBox.getChildren().setAll(scroll);
     }
 
     /* ==================== Overview stat cards ==================== */
@@ -719,7 +803,7 @@ public class MainController {
                     long count = energyCalculator.getEnergyLayerCount(geDataModels);
                     statusLabel.setText("Energy calculation completed. " + count + " layers have positive energy values.");
                     appendLog("能量计算完成 · " + count + " 层有能量值");
-                    selectTab(energyTab);
+                    selectView(ViewMode.ENERGY);
                 },
                 "Energy Calculation Error");
     }
@@ -939,7 +1023,7 @@ public class MainController {
         lastThreeDImage = result.outputFile();
         statusLabel.setText("3D image generated successfully.");
         appendLog("三维岩层图生成完成");
-        selectTab(d3Tab);
+        selectView(ViewMode.THREE_D);
         refreshD3Tab();
     }
 
@@ -1174,7 +1258,7 @@ public class MainController {
             if (layerHeight >= 20) {
                 Label label = new Label(layer.getNum() + "  " + safe(layer.getName())
                         + "   " + formatPlain(layer.getH()) + " m");
-                label.getStyleClass().add(isDarkLithology(layer) ? "profile-label-dark" : "profile-label");
+                label.getStyleClass().add(needsLightLabel(layer) ? "profile-label-dark" : "profile-label");
                 label.setLayoutX(10);
                 label.setLayoutY(currentY + Math.max(0, layerHeight / 2 - 8));
                 label.setMouseTransparent(true);
@@ -1216,8 +1300,29 @@ public class MainController {
         return LITHOLOGY_COLORS.getOrDefault(layer.getName().trim(), DEFAULT_LITHOLOGY_COLOR);
     }
 
-    private boolean isDarkLithology(GeDataModel layer) {
-        return layer.getName() != null && layer.getName().contains("煤");
+    /**
+     * Picks whichever profile-label colour contrasts better with the bar's fill. The old
+     * "name contains 煤" rule only held while every other lithology was a light beige.
+     */
+    private boolean needsLightLabel(GeDataModel layer) {
+        double bar = relativeLuminance(colorForLayer(layer));
+        return contrastRatio(bar, relativeLuminance("#EEF1F3"))
+                > contrastRatio(bar, relativeLuminance("#1E2833"));
+    }
+
+    private static double contrastRatio(double first, double second) {
+        return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    }
+
+    private static double relativeLuminance(String hexColor) {
+        return 0.2126 * channelLuminance(Integer.parseInt(hexColor.substring(1, 3), 16))
+                + 0.7152 * channelLuminance(Integer.parseInt(hexColor.substring(3, 5), 16))
+                + 0.0722 * channelLuminance(Integer.parseInt(hexColor.substring(5, 7), 16));
+    }
+
+    private static double channelLuminance(int value) {
+        double channel = value / 255.0;
+        return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
     }
 
     /* ==================== Selected-layer detail panel ==================== */
@@ -1232,6 +1337,7 @@ public class MainController {
             Label hint = new Label("在剖面图或数据表中点击任一岩层，此处显示其输入参数与计算结果。");
             hint.getStyleClass().add("text-caption");
             hint.setWrapText(true);
+            hint.setMinHeight(Region.USE_PREF_SIZE);
             VBox box = new VBox(10, empty, hint);
             box.setAlignment(Pos.TOP_CENTER);
             detailPanel.getChildren().add(box);

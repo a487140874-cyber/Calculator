@@ -32,11 +32,11 @@
     -banner-warning-bg: #FDF7E9; -banner-warning-bd: #ECD7A4;
     -banner-danger-bg: #FDF1EC;  -banner-danger-bd: #EECFC4;
 
-    -lith-mudstone: #A79F95;
-    -lith-sandy-mudstone: #B9B2A4;
-    -lith-fine-sandstone: #CDC5AE;
-    -lith-medium-sandstone: #C0B18F;
-    -lith-coal: #3A3A3D;
+    -lith-mudstone: #7D7468;
+    -lith-sandy-mudstone: #A38C6C;
+    -lith-fine-sandstone: #E0CE96;
+    -lith-medium-sandstone: #D2A03F;
+    -lith-coal: #2E2E33;
 
     -tag-key-bg: #E8EFF6;      -tag-key-fg: #17497A;      -tag-key-bd: #C9D9E8;
     -tag-nokey-bg: #F4F6F8;    -tag-nokey-fg: #6B7884;    -tag-nokey-bd: #E6EAEE;
@@ -86,6 +86,9 @@
     -tag-energy-bg: rgba(247, 201, 72, 0.16); -tag-energy-fg: #FFD873; -tag-energy-bd: rgba(247, 201, 72, 0.4);
     -tag-risk-bg: rgba(255, 107, 107, 0.22);  -tag-risk-fg: #FFB3B3;  -tag-risk-bd: rgba(255, 107, 107, 0.55);
     -tag-done-bg: rgba(81, 207, 102, 0.16);   -tag-done-fg: #8BE89D;  -tag-done-bd: rgba(81, 207, 102, 0.4);
+
+    /* workspace背景用渐变，对应原型 body 的 radial+linear 叠加 */
+    -fx-background-color: linear-gradient(to bottom right, #0C121A, #111A24 42%, #0E151E);
 }
 
 /* ---- monospace / tabular numeric values (params, energy values, timestamps, logs) ---- */
@@ -118,6 +121,7 @@
     -fx-border-color: -primary-dark;
     -fx-border-width: 1px;
 }
+.btn-primary .label { -fx-text-fill: white; }
 .btn-primary:hover { -fx-background-color: -primary-dark; }
 .btn-secondary {
     -fx-background-color: -panel-white;
@@ -125,6 +129,7 @@
     -fx-border-color: -border-strong;
     -fx-border-width: 1px;
 }
+.btn-secondary .label { -fx-text-fill: -primary; }
 .btn-secondary:hover { -fx-background-color: -hover-bg; }
 .btn-ghost {
     -fx-background-color: transparent;
@@ -132,7 +137,9 @@
     -fx-border-color: -border;
     -fx-border-width: 1px;
 }
+.btn-ghost .label { -fx-text-fill: -text-soft; }
 .btn-ghost:hover { -fx-background-color: -divider; }
+.menu-button > .arrow-button > .arrow { -fx-background-color: -primary; }
 .btn-small { -fx-min-height: 26px; -fx-padding: 0 9px; -fx-font-size: 12px; }
 .button:disabled { -fx-opacity: 0.55; }
 
@@ -141,16 +148,51 @@
     -fx-background-color: -panel-white;
     -fx-border-color: -border;
     -fx-border-width: 1px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+}
+.theme-dark .app-panel, .theme-dark .stat-card {
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.28), 26, 0, 0, 12);
 }
 .stat-card {
     -fx-background-color: -panel-white;
     -fx-border-color: -border;
     -fx-border-width: 1px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-padding: 12px 14px 13px 14px;
+}
+
+/* Panel header / body split used by every framed panel */
+.panel-header {
+    -fx-padding: 12px 14px 10px 14px;
+    -fx-border-color: transparent transparent -divider transparent;
+    -fx-border-width: 1px;
+}
+.panel-body { -fx-padding: 12px 14px 14px 14px; }
+
+/* Inline explanatory block (prototype's ".notice") */
+.notice {
+    -fx-background-color: -primary-soft;
+    -fx-text-fill: -text-soft;
+    -fx-border-color: -tag-key-bd;
+    -fx-border-width: 1px;
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
-    -fx-padding: 11px 13px 12px 13px;
+    -fx-padding: 10px 12px;
+    -fx-font-size: 11.5px;
+}
+
+/* Pill badge in the header */
+.badge {
+    -fx-background-color: -primary-soft;
+    -fx-text-fill: -tag-key-fg;
+    -fx-border-color: -tag-key-bd;
+    -fx-border-width: 1px;
+    -fx-background-radius: 20px;
+    -fx-border-radius: 20px;
+    -fx-padding: 4px 12px;
+    -fx-font-size: 11.5px;
 }
 
 /* Conclusion / result banners (left accent bar, tone-colored) */
@@ -183,7 +225,7 @@
 .tag-done     { -fx-background-color: -tag-done-bg;     -fx-text-fill: -tag-done-fg;     -fx-border-color: -tag-done-bd; }
 
 /* ---- 6. Flow step navigator ---- */
-.step-nav { -fx-background-color: -panel-white; -fx-border-color: transparent -border transparent transparent; -fx-border-width: 1px; }
+.step-nav { -fx-background-color: transparent; }
 .step-cell { -fx-padding: 9px 10px; -fx-background-radius: 7px; -fx-cursor: hand; }
 .step-cell:hover { -fx-background-color: -divider; }
 .step-cell-active { -fx-background-color: -primary-soft; }
@@ -198,33 +240,85 @@
 .step-mark-error   { -fx-background-color: -accent-red; -fx-text-fill: white; }
 .step-mark-locked  { -fx-background-color: -divider; -fx-text-fill: -text-muted; }
 
-/* ---- 7. Tab bar ---- */
-.workbench-tabs .tab-header-area { -fx-padding: 0; }
-.workbench-tabs .tab-header-background { -fx-background-color: -panel-white; }
-.workbench-tabs .tab { -fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0 16px; }
-.workbench-tabs .tab:selected { -fx-background-color: transparent; }
-.workbench-tabs .tab-label { -fx-text-fill: -text-soft; -fx-font-size: 13px; }
-.workbench-tabs .tab:selected .tab-label { -fx-text-fill: -primary; -fx-font-weight: bold; }
-.workbench-tabs .tab-content-area { -fx-background-color: -bg-main; }
+/* ---- 7. Viewer pill switcher (replaces the old tab bar) ---- */
+.view-pills {
+    -fx-padding: 10px 14px;
+    -fx-border-color: transparent transparent -divider transparent;
+    -fx-border-width: 1px;
+}
+.view-pill {
+    -fx-background-color: -panel-soft;
+    -fx-text-fill: -text-soft;
+    -fx-border-color: -border;
+    -fx-border-width: 1px;
+    -fx-background-radius: 20px;
+    -fx-border-radius: 20px;
+    -fx-padding: 0 14px;
+    -fx-min-height: 28px;
+    -fx-font-size: 12px;
+}
+.view-pill:hover { -fx-background-color: -hover-bg; }
+.view-pill-active {
+    -fx-background-color: -primary-soft;
+    -fx-text-fill: -primary;
+    -fx-border-color: -tag-key-bd;
+    -fx-font-weight: bold;
+}
+.view-pill:disabled { -fx-opacity: 0.45; }
+
+/* Scale / dimension readout floating at the viewer's bottom-left */
+.scale-info {
+    -fx-background-color: -panel-soft;
+    -fx-border-color: -border;
+    -fx-border-width: 1px;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-padding: 9px 12px;
+    -fx-font-size: 11px;
+    -fx-text-fill: -text-soft;
+}
+.viewer-panel { -fx-min-height: 260px; }
+.side-panel { -fx-min-height: 0; }
 
 /* ---- 8. Table ---- */
-.table-view { -fx-background-color: -panel-white; -fx-border-color: -border; }
+.table-view {
+    -fx-background-color: -panel-white;
+    -fx-border-color: -border;
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+}
 .table-view .column-header-background { -fx-background-color: -column-header-bg; }
-.table-view .column-header { -fx-border-color: transparent -border transparent transparent; }
+.table-view .column-header,
+.table-view .column-header-background .filler {
+    -fx-background-color: -column-header-bg;
+    -fx-border-color: transparent -border transparent transparent;
+}
+.table-view .table-cell { -fx-text-fill: -text-main; }
+.table-view .placeholder .label { -fx-text-fill: -text-muted; }
+.table-view:focused { -fx-background-color: -panel-white; }
 .table-view .column-header .label { -fx-text-fill: -column-header-fg; -fx-font-weight: bold; -fx-font-size: 11.5px; }
-.table-row-cell { -fx-border-color: transparent transparent -divider transparent; }
-.table-row-cell:odd { -fx-background-color: -panel-soft; }
+.table-row-cell {
+    -fx-border-color: transparent transparent -divider transparent;
+    -fx-background: -panel-white;
+    -fx-background-color: -panel-white;
+}
+.table-row-cell:odd {
+    -fx-background: -panel-soft;
+    -fx-background-color: -panel-soft;
+}
+.table-view .table-row-cell .table-cell { -fx-text-fill: -text-main; }
 .table-row-cell:selected { -fx-background-color: -primary-soft; }
 .table-row-cell:selected .text { -fx-fill: -text-main; }
 
 /* ---- 9. Status bar / app bar ---- */
-.app-bar { -fx-background-color: -panel-white; -fx-border-color: transparent transparent -border transparent; -fx-border-width: 1px; -fx-min-height: 52px; -fx-padding: 0 14px; }
+.app-header { -fx-background-color: -panel-white; -fx-border-color: transparent transparent -border transparent; -fx-border-width: 1px; -fx-min-height: 68px; -fx-padding: 0 16px; }
+.status-bar .label { -fx-text-fill: -text-soft; -fx-font-size: 11.5px; }
 .status-bar { -fx-background-color: -panel-white; -fx-border-color: -border transparent transparent transparent; -fx-border-width: 1px; -fx-min-height: 30px; -fx-padding: 0 12px; -fx-font-size: 11.5px; -fx-text-fill: -text-soft; }
 
 /* ---- 10. Detail panel ---- */
-.detail-panel { -fx-background-color: -panel-white; -fx-border-color: transparent transparent transparent -border; -fx-border-width: 1px; }
+.detail-panel { -fx-background-color: -panel-white; }
 .layer-num-badge {
-    -fx-background-color: -text-main; -fx-text-fill: white; -fx-background-radius: 6px;
+    -fx-background-color: -primary; -fx-text-fill: white; -fx-background-radius: 6px;
     -fx-padding: 4px 7px; -fx-font-size: 12px; -fx-font-weight: 600;
 }
 
@@ -242,6 +336,7 @@
 .menu-item .label { -fx-text-fill: -text-main; }
 .menu-item:focused { -fx-background-color: -primary-soft; }
 .menu, .context-menu { -fx-background-color: -panel-white; -fx-border-color: -border; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; }
 .scroll-bar { -fx-background-color: transparent; }
 .scroll-bar .thumb { -fx-background-color: -border-strong; -fx-background-radius: 5px; }
 .scroll-bar .track { -fx-background-color: transparent; }
