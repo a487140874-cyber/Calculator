@@ -12,7 +12,7 @@ Run on an Apple Silicon Mac:
 sh packaging/package-macos-arm64.sh
 ```
 
-Output: `dist/macos-arm64/Calculator-1.0.0.dmg`
+Output: `dist/macos-arm64/超长工作面采动覆岩承载结构能量积聚预测系统-1.0.0.dmg`
 
 The local package is unsigned. macOS Gatekeeper may ask the user to confirm opening it.
 Public distribution requires an Apple Developer ID signature and notarization.
@@ -32,7 +32,7 @@ Run in PowerShell:
 .\packaging\package-windows-x64.ps1
 ```
 
-Output: `dist\windows-x64\Calculator-1.0.0.exe`
+Output: `dist\windows-x64\超长工作面采动覆岩承载结构能量积聚预测系统-1.0.0.exe`
 
 ## 3D feature
 

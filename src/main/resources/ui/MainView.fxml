@@ -27,7 +27,7 @@
 
             <HBox fx:id="appBar" styleClass="app-header" alignment="CENTER_LEFT" spacing="14">
                 <VBox spacing="3">
-                    <Label styleClass="text-title-lg" text="覆岩关键层分析系统" />
+                    <Label styleClass="text-title-lg" text="超长工作面采动覆岩承载结构能量积聚预测系统" />
                     <HBox spacing="8" alignment="CENTER_LEFT">
                         <Label fx:id="fileNameLabel" styleClass="text-caption" text="未打开文件" />
                         <Label fx:id="fileBadgeLabel" styleClass="tag, tag-nokey" text="等待导入" />

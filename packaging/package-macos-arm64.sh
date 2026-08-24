@@ -20,16 +20,16 @@ cp "$PROJECT_DIR/target/calculator-executable.jar" "$INPUT_DIR/Calculator.jar"
 
 "$JAVA_HOME/bin/jpackage" \
   --type dmg \
-  --name Calculator \
+  --name "超长工作面采动覆岩承载结构能量积聚预测系统" \
   --app-version 1.0.0 \
-  --vendor Calculator \
-  --description "Geological key-layer, collapse, energy and 3D visualization calculator" \
+  --vendor "超长工作面采动覆岩承载结构能量积聚预测系统" \
+  --description "超长工作面采动覆岩承载结构能量积聚预测系统：关键层判别、垮落与破断分析、能量积聚计算与三维可视化" \
   --input "$INPUT_DIR" \
   --main-jar Calculator.jar \
   --main-class ui.Launcher \
   --dest "$OUTPUT_DIR" \
   --mac-package-identifier com.example.calculator \
-  --mac-package-name Calculator \
+  --mac-package-name "超长工作面采动覆岩承载结构能量积聚预测系统" \
   --mac-app-category public.app-category.utilities \
   --java-options -Dfile.encoding=UTF-8
 

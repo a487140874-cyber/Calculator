@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $ProjectDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $OutputDir = Join-Path $ProjectDir "dist\windows-x64"
@@ -26,17 +26,17 @@ try {
 
     & "$PackageJavaHome\bin\jpackage.exe" `
         --type exe `
-        --name Calculator `
+        --name "超长工作面采动覆岩承载结构能量积聚预测系统" `
         --app-version 1.0.0 `
-        --vendor Calculator `
-        --description "Geological key-layer, collapse, energy and 3D visualization calculator" `
+        --vendor "超长工作面采动覆岩承载结构能量积聚预测系统" `
+        --description "超长工作面采动覆岩承载结构能量积聚预测系统：关键层判别、垮落与破断分析、能量积聚计算与三维可视化" `
         --input $InputDir `
         --main-jar Calculator.jar `
         --main-class ui.Launcher `
         --dest $OutputDir `
         --win-dir-chooser `
         --win-menu `
-        --win-menu-group Calculator `
+        --win-menu-group "超长工作面采动覆岩承载结构能量积聚预测系统" `
         --win-shortcut `
         --java-options "-Dfile.encoding=UTF-8"
 }

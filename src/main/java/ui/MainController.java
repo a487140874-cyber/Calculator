@@ -1510,9 +1510,9 @@ public class MainController {
     @FXML
     private void handleAbout() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("About");
-        alert.setHeaderText("Geological Key Layer Calculator");
-        alert.setContentText("This program calculates key geological layers, collapse potential, and energy distribution from imported Excel data.");
+        alert.setTitle("关于");
+        alert.setHeaderText("超长工作面采动覆岩承载结构能量积聚预测系统");
+        alert.setContentText("导入岩层 Excel 数据，计算关键层、垮落与破断、能量积聚，并生成三维可视化。");
         alert.showAndWait();
     }
 
