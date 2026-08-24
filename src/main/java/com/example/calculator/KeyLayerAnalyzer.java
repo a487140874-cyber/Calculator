@@ -15,19 +15,6 @@ import static java.lang.Math.abs;
  */
 public class KeyLayerAnalyzer {
 
-    /**
-     * 推进距离 ax 达到该值时，视为「大推进距离」工况，强制把所有岩层的 by 改写为
-     * {@link #FORCED_BY_ON_LARGE_AX}。
-     *
-     * <p>此阈值必须与 {@link ComputeKeyLayerShi#SPECIAL_MODE_AX_THRESHOLD}、以及
-     * Python 脚本 {@code generate_3d_layers.py} 中的判定保持一致——三处判定的是
-     * 同一个工况。（原先此处为 279、另两处为 280，ax=279 时行为分叉，现已统一为 279。）
-     */
-    private static final double LARGE_AX_THRESHOLD = 279;
-
-    /** 大推进距离工况下，强制覆盖所有岩层的 by 值。 */
-    private static final BigDecimal FORCED_BY_ON_LARGE_AX = BigDecimal.valueOf(400);
-
     /** 破断步距搜索：起始值。 */
     private static final double FRACTURE_SEARCH_START = 1.0;
 
@@ -154,6 +141,31 @@ public class KeyLayerAnalyzer {
             }
         }
         return geDataModel;
+    }
+
+    /**
+     * 判定 {@code current} 层不垮落，并连同其上覆的所有岩层一起标记为不垮落，然后结束整条计算。
+     *
+     * <p>物理依据：关键层一旦不破断，就托住了它上面的全部岩层，上覆各层自然也不会垮落。
+     * 因此首个不垮落的关键层构成分界面——其下为垮落带（已垮落），其上（含本层）均为未垮落。
+     *
+     * <p>此前的写法是只给当前层置位就直接 return，上覆各层从未被评估、`isNotCrack` 停留在
+     * 默认的 false，界面于是把它们显示成「已垮落」，与实际情况相反。
+     *
+     * <p>注意：能量计算 {@link ComputeKeyLayerShi#computeMain} 取<b>第一个</b>
+     * isNotCrack 层作为起始层（正向遍历后 break），该层不受本方法影响，故能量结果不变。
+     */
+    private List<GeDataModel> markNotCrackFromHere(List<GeDataModel> geDataModels, GeDataModel current) {
+        boolean reached = false;
+        for (GeDataModel model : geDataModels) {
+            if (model == current) {
+                reached = true;
+            }
+            if (reached) {
+                model.setNotCrack(true);
+            }
+        }
+        return geDataModels;
     }
 
     /**
@@ -637,13 +649,6 @@ public class KeyLayerAnalyzer {
 
     //计算逻辑
     public List<GeDataModel> compute(List<GeDataModel> geDataModels){
-        LayerLoadCalculator layerLoadCalculator = new LayerLoadCalculator();
-        //这里计算关键层
-        if(geDataModels.getFirst().getAx().doubleValue() >= LARGE_AX_THRESHOLD){
-            for(int i = 0; i < geDataModels.size(); i++){
-                geDataModels.get(i).setBy(FORCED_BY_ON_LARGE_AX);
-            }
-        }
         //初始化数据
         geDataModels = this.initModel(geDataModels);
 
@@ -697,30 +702,25 @@ public class KeyLayerAnalyzer {
                     if(j < 0){
                         System.out.println("第" + geDataModel.getNum() + "层：搜索至上界 "
                                 + FRACTURE_SEARCH_MAX + " 仍未达到极限破断弯矩，判定为不破断。");
-                        geDataModel.setNotCrack(true);
-                        return geDataModels;
+                        return markNotCrackFromHere(geDataModels, geDataModel);
                     }
 
                     u = computeU2(geDataModel,BigDecimal.valueOf(j)).doubleValue();
                     geDataModel.setLastAi(BigDecimal.valueOf(j));
                     if(j > geDataModel.getAi().doubleValue()){
-                        geDataModel.setNotCrack(true);
-                        return geDataModels;
+                        return markNotCrackFromHere(geDataModels, geDataModel);
                     }
                     if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
-                        geDataModel.setNotCrack(true);
-                        return geDataModels;
+                        return markNotCrackFromHere(geDataModels, geDataModel);
                     }
                 }else{
                     u = computeU(geDataModel,BigDecimal.valueOf(j)).doubleValue();
                     geDataModel.setLastAi(BigDecimal.valueOf(j));
                     if(j > geDataModel.getAi().doubleValue()){
-                        geDataModel.setNotCrack(true);
-                        return geDataModels;
+                        return markNotCrackFromHere(geDataModels, geDataModel);
                     }
                     if(!computeS(geDataModels, geDataModel.getNum(),BigDecimal.valueOf(u))){
-                        geDataModel.setNotCrack(true);
-                        return geDataModels;
+                        return markNotCrackFromHere(geDataModels, geDataModel);
                     }
                 }
 
@@ -731,4 +731,3 @@ public class KeyLayerAnalyzer {
 
 
     }
-

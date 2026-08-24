@@ -24,8 +24,6 @@ public class LayerLoadCalculator {
     }
 
 
-    ArrayList<Integer> keyLayers = new ArrayList<>();
-
     // 动态计算任意层数的载荷
     public static BigDecimal calculateLayerLoad(BigDecimal[] E, BigDecimal[] h, BigDecimal[] l, int layerIndex,int currentLayer) {
         BigDecimal numerator = BigDecimal.ZERO;
@@ -65,6 +63,8 @@ public class LayerLoadCalculator {
 
     // 求得所有关键层
     public List<GeDataModel> findKeyLayers(List<GeDataModel> geDataModels) {
+        validateLayers(geDataModels);
+        geDataModels.forEach(model -> model.setKeyLayer(false));
         int currentLayer = 0; // 初始层
         BigDecimal[][] data = getData(geDataModels);
         int layerCount = data.length;
@@ -93,12 +93,30 @@ public class LayerLoadCalculator {
                     //重新计算本层数据
                     loads[i] = calculateLayerLoad(E, h, l, i + 1 , currentLayer);
                     //记录关键层
-                    keyLayers.add(currentLayer);
                     geDataModels.get(i).setKeyLayer(true);
                 }
             }
             System.out.println("Layer " + (i + 1) + " Load: " + loads[i]);
         }
         return geDataModels;
+    }
+
+    private void validateLayers(List<GeDataModel> layers) {
+        if (layers == null || layers.isEmpty()) {
+            throw new IllegalArgumentException("岩层数据不能为空");
+        }
+        for (int i = 0; i < layers.size(); i++) {
+            GeDataModel layer = layers.get(i);
+            int expectedNumber = i + 1;
+            if (layer.getNum() != expectedNumber) {
+                throw new IllegalArgumentException("岩层编号必须从1开始连续排列，缺少或错位的编号: " + expectedNumber);
+            }
+            if (layer.getE() == null || layer.getH() == null || layer.getL() == null) {
+                throw new IllegalArgumentException("第" + expectedNumber + "层缺少E、H或L参数");
+            }
+            if (layer.getH().signum() <= 0) {
+                throw new IllegalArgumentException("第" + expectedNumber + "层厚度必须大于0");
+            }
+        }
     }
 }

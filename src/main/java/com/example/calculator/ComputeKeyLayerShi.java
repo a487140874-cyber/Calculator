@@ -14,24 +14,6 @@ import java.util.List;
 
 public class ComputeKeyLayerShi {
 
-    /**
-     * 推进距离 ax 达到该值时，启用「大推进距离」特殊计算逻辑
-     * （只算第 {@link #SPECIAL_LAYER_A}、{@link #SPECIAL_LAYER_B} 层的能量）。
-     *
-     * <p>此阈值必须与 {@code KeyLayerAnalyzer.LARGE_AX_THRESHOLD}、以及 Python 脚本
-     * {@code generate_3d_layers.py} 中的判定保持一致——三处判定的是同一个工况。
-     *
-     * <p>原为 280，而 KeyLayerAnalyzer 处为 279，导致 ax=279 时行为分叉：by 被改写为 400，
-     * 但特殊能量模式不启用，能量会算到第 20 层而非第 15/18 层。现统一为 279。
-     * 之所以往 279 统一而非 280：ax≥279 时 by 被改写为 400，恰好使搜索总在有上界的
-     * 循环中命中；若把此处的阈值抬到 280，ax=279 将失去这层保护。
-     */
-    static final double SPECIAL_MODE_AX_THRESHOLD = 279;
-
-    /** 大推进距离工况下参与能量计算的两个特殊层号。 */
-    private static final int SPECIAL_LAYER_A = 15;
-    private static final int SPECIAL_LAYER_B = 18;
-
     /** 能量公式中，用于把积分结果扩展到岩层影响范围的跨度余量。 */
     private static final double ENERGY_SPAN_MARGIN = 120;
 
@@ -555,50 +537,9 @@ public class ComputeKeyLayerShi {
             return null;
         }
 
-        // 检查是否需要执行特殊逻辑：当ax >= 280时，只计算第15和第18层的能量
         GeDataModel startLayer = geDataModels.get(startLayerIndex);
-        BigDecimal axValue = startLayer.getAx();
-        boolean useSpecialLogic = (axValue != null && axValue.compareTo(BigDecimal.valueOf(SPECIAL_MODE_AX_THRESHOLD)) >= 0);
-        
-        if (useSpecialLogic) {
-            System.out.println("检测到ax >= 280，启用特殊计算逻辑：只计算第15和第18层的能量");
-            
-            // 特殊逻辑：只计算第15层和第18层的能量
-            for (int i = 0; i < geDataModels.size(); i++) {
-                GeDataModel layer = geDataModels.get(i);
-                int layerNum = layer.getNum();
 
-                
-                // 只处理第15层和第18层
-                if ((layerNum == SPECIAL_LAYER_A || layerNum == SPECIAL_LAYER_B) && layer.isKeyLayer()) {
-                    // 使用与起始层相同的计算逻辑，但lowbound2使用当前层的lastAi
-                    double layerMix, layerMiy;
-
-
-                    if (layer.getLastAi() != null) {
-                        // 使用lastAi作为lowbound2参数
-                        layerMix = computeMix(layer, layer.getLastAi().doubleValue()).doubleValue();
-                    } else {
-                        // 如果lastAi为空，使用ai作为备选
-                        layerMix = computeMix(layer, layer.getAi().doubleValue()).doubleValue();
-                    }
-                    
-                    layerMiy = computeMiy(layer, layer.getBi().doubleValue()).doubleValue();
-                    
-                    double layerBi = layer.getBi().doubleValue();
-                    double layerAi = layer.getAi().doubleValue();
-                    BigDecimal layerPower = BigDecimal.valueOf((layerMix * (layerBi + ENERGY_SPAN_MARGIN) + layerMiy * (layerAi + ENERGY_SPAN_MARGIN)) / 2);
-                    layer.setPower(layerPower);
-
-                    System.out.println("特殊逻辑计算完成 - 第" + layerNum + "层能量: " + layerPower);
-                }
-            }
-            
-            return geDataModels;
-        }
-        
-        // 正常逻辑：计算起始层（isNotCrack为true的层）的能量
-        // 这一层特殊处理：直接使用本层的ai和bi作为积分范围
+        // 计算起始层（isNotCrack=true）的能量，积分范围直接使用本层 ai 和 bi
         double startLayerMix = computeMix(startLayer, startLayer.getAi().doubleValue()).doubleValue();
         double startLayerMiy = computeMiy(startLayer, startLayer.getBi().doubleValue()).doubleValue();
         
@@ -679,8 +620,6 @@ public class ComputeKeyLayerShi {
      *
      * 计算能量用当前层的数据。
      *
-     * 当ax大于某个范围是；15，18层特殊处理。
-     * 15 和 18层的所有的a都用ai，计算积分的范围就是ai，bxi
      */
 
 }

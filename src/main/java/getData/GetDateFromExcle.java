@@ -10,7 +10,6 @@ import java.util.List;
 
 //从excle中获取数据
 public class GetDateFromExcle {
-    public static List<GeDataModel> geDataModels;
     public List<GeDataModel> getData(String path)
     {
         System.out.println(System.getProperty("java.class.path"));
@@ -19,7 +18,7 @@ public class GetDateFromExcle {
         // 检查文件是否存在
         if (fileName == null || fileName.trim().isEmpty()) {
             System.out.println("文件路径不能为空！");
-            return null;
+            throw new IllegalArgumentException("文件路径不能为空");
         }
         // 创建监听器实例
         DataListener dataListener = new DataListener();
@@ -40,10 +39,8 @@ public class GetDateFromExcle {
             System.out.println("读取的所有数据: ");
             dataListener.getDataList().forEach(System.out::println);
         } catch (Exception e) {
-            System.out.println("读取文件失败，请检查路径和文件格式是否正确！");
-            e.printStackTrace();
+            throw new IllegalStateException("读取文件失败，请检查路径和文件格式是否正确", e);
         }
-        geDataModels = geDataModelList;
         return geDataModelList;
 
     }

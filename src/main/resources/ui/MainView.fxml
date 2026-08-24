@@ -3,15 +3,20 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<?import javafx.scene.text.Font?>
 
-<BorderPane xmlns="http://javafx.com/javafx/11.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.MainController">
+<!--
+  Layout mirrors the dark "地质岩层计算器" prototype: a title header, a three-column
+  main area (flow panel / viewer / selected-layer detail) and a full-width bottom row
+  (layer table / import-export + activity log). Views that used to be TabPane tabs are
+  now switched by the pill row above the viewer.
+-->
+<BorderPane fx:id="rootPane" xmlns="http://javafx.com/javafx/11.0.2" xmlns:fx="http://javafx.com/fxml/1" fx:controller="ui.MainController">
     <top>
         <VBox>
             <MenuBar>
                 <Menu mnemonicParsing="false" text="File">
-                    <MenuItem mnemonicParsing="false" onAction="#handleImportExcel" text="Import from Excel..." />
-                    <MenuItem mnemonicParsing="false" onAction="#handleExportExcel" text="Export to Excel..." />
+                    <MenuItem fx:id="importMenuItem" mnemonicParsing="false" onAction="#handleImportExcel" text="Import from Excel..." />
+                    <MenuItem fx:id="exportMenuItem" mnemonicParsing="false" onAction="#handleExportExcel" text="Export to Excel..." />
                     <SeparatorMenuItem mnemonicParsing="false" />
                     <MenuItem mnemonicParsing="false" onAction="#handleExit" text="Exit" />
                 </Menu>
@@ -19,56 +24,137 @@
                     <MenuItem mnemonicParsing="false" onAction="#handleAbout" text="About" />
                 </Menu>
             </MenuBar>
-            <ToolBar>
-                <Button onAction="#handleImportExcel" text="Import Data" />
-                <Button fx:id="calculateKeyLayersButton" onAction="#handleCalculateKeyLayers" text="1. Calculate Key Layers" />
-                <Button fx:id="calculateCollapseButton" onAction="#handleCalculateCollapse" text="2. Calculate Collapse" />
-                <Button fx:id="calculateEnergyButton" onAction="#handleCalculateEnergy" text="3. Calculate Energy" />
-                <Button fx:id="generate3DButton" onAction="#handleGenerate3D" text="4. Generate 3D Image" />
-                <Button fx:id="exportButton" onAction="#handleExportExcel" text="Export Results" />
-            </ToolBar>
+
+            <HBox fx:id="appBar" styleClass="app-header" alignment="CENTER_LEFT" spacing="14">
+                <VBox spacing="3">
+                    <Label styleClass="text-title-lg" text="超长工作面采动覆岩承载结构能量积聚预测系统" />
+                    <HBox spacing="8" alignment="CENTER_LEFT">
+                        <Label fx:id="fileNameLabel" styleClass="text-caption" text="未打开文件" />
+                        <Label fx:id="fileBadgeLabel" styleClass="tag, tag-nokey" text="等待导入" />
+                    </HBox>
+                </VBox>
+                <Region HBox.hgrow="ALWAYS" />
+                <Label styleClass="badge" text="Excel 导入" />
+                <Label styleClass="badge" text="内置计算公式" />
+                <Label styleClass="badge" text="真实厚度比例" />
+                <Button fx:id="themeToggleButton" styleClass="btn-ghost" onAction="#handleToggleTheme" text="浅色模式" />
+                <Button fx:id="importButton" styleClass="btn-primary" onAction="#handleImportExcel" text="导入数据" />
+                <MenuButton fx:id="exportButton" styleClass="btn-secondary" text="导出结果">
+                    <items>
+                        <MenuItem text="导出 Excel 结果" onAction="#handleExportExcel" />
+                        <MenuItem fx:id="exportImageMenuItem" text="导出三维图片" onAction="#handleExportThreeDImage" />
+                    </items>
+                </MenuButton>
+            </HBox>
         </VBox>
     </top>
-    <center>
-        <SplitPane dividerPositions="0.75" BorderPane.alignment="CENTER">
-            <TableView fx:id="dataTable" prefHeight="200.0" prefWidth="200.0">
-                <columns>
-                    <TableColumn fx:id="numCol" prefWidth="50.0" text="Num" />
-                    <TableColumn fx:id="nameCol" prefWidth="120.0" text="Name" />
-                    <TableColumn fx:id="hCol" prefWidth="75.0" text="H (Thickness)" />
-                    <TableColumn fx:id="lCol" prefWidth="75.0" text="L (Volume)" />
-                    <TableColumn fx:id="eCol" prefWidth="100.0" text="E (Elasticity)" />
-                    <TableColumn fx:id="rCol" prefWidth="100.0" text="R (Tensile)" />
-                    <TableColumn fx:id="isKeyLayerCol" prefWidth="100.0" text="Is Key Layer?" />
-                    <TableColumn fx:id="isNotCrackCol" prefWidth="100.0" text="Will Collapse?" />
-                    <TableColumn fx:id="lastAiCol" prefWidth="100.0" text="Fracture Dist." />
-                </columns>
-                <columnResizePolicy>
-                    <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
-                </columnResizePolicy>
-            </TableView>
-            <VBox alignment="TOP_CENTER" spacing="10.0" style="-fx-background-color: #ECECEC;">
-                <padding>
-                    <Insets bottom="10.0" left="10.0" right="10.0" top="10.0" />
-                </padding>
-                <Label text="Rock Layers Visualization">
-                    <font>
-                        <Font name="System Bold" size="14.0" />
-                    </font>
-                </Label>
-                <ScrollPane fx:id="scrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+
+    <left>
+        <VBox styleClass="app-panel, side-panel" prefWidth="268" minWidth="268" maxWidth="268">
+            <VBox styleClass="panel-header" spacing="3">
+                <Label styleClass="text-panel-head" text="分析流程面板" />
+                <Label styleClass="text-caption" text="按顺序执行：导入 → 关键层 → 垮落 → 能量 → 三维。" wrapText="true" minWidth="0" minHeight="-Infinity" maxWidth="236" />
+            </VBox>
+            <VBox styleClass="panel-body" spacing="10" VBox.vgrow="ALWAYS">
+                <Label styleClass="notice" text="岩层剖面按真实厚度比例自下而上堆叠；计算结果全部由内置地质力学公式得出，不需要手动录入。" wrapText="true" minWidth="0" minHeight="-Infinity" maxWidth="236" />
+                <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
+                            style="-fx-background: transparent; -fx-background-color: transparent;">
                     <content>
-                        <Pane fx:id="visualizationPane" prefHeight="600.0" />
+                        <VBox fx:id="stepNav" styleClass="step-nav" spacing="2" />
                     </content>
                 </ScrollPane>
             </VBox>
-        </SplitPane>
+        </VBox>
+    </left>
+
+    <center>
+        <VBox spacing="12">
+            <padding><Insets top="12" right="12" bottom="12" left="12" /></padding>
+
+            <HBox fx:id="statCardsBox" spacing="10" />
+
+            <VBox styleClass="app-panel, viewer-panel" VBox.vgrow="ALWAYS">
+                <HBox fx:id="viewPillsBox" styleClass="view-pills" spacing="8" alignment="CENTER_LEFT" />
+                <StackPane fx:id="viewerStack" VBox.vgrow="ALWAYS">
+                    <VBox fx:id="profileViewBox">
+                        <ScrollPane fx:id="scrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS"
+                                    style="-fx-background: transparent; -fx-background-color: transparent;">
+                            <content>
+                                <Pane fx:id="visualizationPane" prefHeight="600.0" />
+                            </content>
+                        </ScrollPane>
+                    </VBox>
+                    <VBox fx:id="energyTabBox" alignment="CENTER" spacing="10" />
+                    <VBox fx:id="d3TabBox" alignment="CENTER" spacing="12" />
+                    <Label fx:id="scaleInfoLabel" styleClass="scale-info, mono-num" StackPane.alignment="BOTTOM_LEFT"
+                           mouseTransparent="true" text="">
+                        <StackPane.margin><Insets bottom="14" left="14" /></StackPane.margin>
+                    </Label>
+                </StackPane>
+            </VBox>
+        </VBox>
     </center>
+
+    <right>
+        <VBox fx:id="detailPanel" styleClass="app-panel, side-panel, detail-panel" prefWidth="308" minWidth="308" maxWidth="308">
+            <padding><Insets top="14" right="14" bottom="14" left="14" /></padding>
+        </VBox>
+    </right>
+
     <bottom>
-        <Label fx:id="statusLabel" text="Status: Ready. Please import an Excel file to begin." BorderPane.alignment="CENTER_LEFT">
-            <padding>
-                <Insets bottom="5.0" left="10.0" right="5.0" top="5.0" />
-            </padding>
-        </Label>
+        <VBox>
+            <HBox spacing="12" prefHeight="292" minHeight="292">
+                <padding><Insets top="0" right="12" bottom="10" left="12" /></padding>
+
+                <VBox styleClass="app-panel" HBox.hgrow="ALWAYS">
+                    <VBox styleClass="panel-header" spacing="3">
+                        <Label styleClass="text-panel-head" text="岩层数据表" />
+                        <Label styleClass="text-caption" text="序号体现自下而上的堆叠顺序；点击任一行可在右侧查看该层的全部参数与计算结果。" wrapText="true" minWidth="0" minHeight="-Infinity" maxWidth="700" />
+                    </VBox>
+                    <VBox styleClass="panel-body" spacing="8" VBox.vgrow="ALWAYS">
+                        <HBox spacing="8" alignment="CENTER_LEFT">
+                            <TextField fx:id="searchField" promptText="按岩层名称搜索…" prefWidth="200" />
+                            <HBox fx:id="filterBox" spacing="6" alignment="CENTER_LEFT" />
+                        </HBox>
+                        <TableView fx:id="dataTable" VBox.vgrow="ALWAYS">
+                            <columns>
+                                <TableColumn fx:id="numCol" prefWidth="50.0" text="序号" />
+                                <TableColumn fx:id="nameCol" prefWidth="110.0" text="岩层名称" />
+                                <TableColumn fx:id="hCol" prefWidth="80.0" text="层厚 H" />
+                                <TableColumn fx:id="lCol" prefWidth="80.0" text="体积力 L" />
+                                <TableColumn fx:id="eCol" prefWidth="90.0" text="弹性模量 E" />
+                                <TableColumn fx:id="rCol" prefWidth="90.0" text="抗拉强度 R" />
+                                <TableColumn fx:id="isKeyLayerCol" prefWidth="90.0" text="是否关键层" />
+                                <TableColumn fx:id="isNotCrackCol" prefWidth="90.0" text="是否未垮落" />
+                                <TableColumn fx:id="lastAiCol" prefWidth="90.0" text="破断步距" />
+                            </columns>
+                            <columnResizePolicy>
+                                <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                            </columnResizePolicy>
+                        </TableView>
+                    </VBox>
+                </VBox>
+
+                <VBox styleClass="app-panel" prefWidth="396" minWidth="396" maxWidth="396">
+                    <VBox styleClass="panel-header" spacing="3">
+                        <Label styleClass="text-panel-head" text="数据导入 / 导出" />
+                        <Label styleClass="text-caption" text="导入 Excel 原始数据，导出计算结果与三维图片。" wrapText="true" minWidth="0" minHeight="-Infinity" maxWidth="360" />
+                    </VBox>
+                    <VBox styleClass="panel-body" spacing="10" VBox.vgrow="ALWAYS">
+                        <HBox spacing="8">
+                            <Button styleClass="btn-primary, btn-small" onAction="#handleImportExcel" text="导入 Excel" />
+                            <Button fx:id="exportExcelButton" styleClass="btn-secondary, btn-small" onAction="#handleExportExcel" text="导出结果" />
+                            <Button fx:id="exportImageButton" styleClass="btn-secondary, btn-small" onAction="#handleExportThreeDImage" text="导出三维图" />
+                        </HBox>
+                        <Label styleClass="text-caption" text="操作与数据质量记录" />
+                        <VBox fx:id="overviewSideBox" VBox.vgrow="ALWAYS" />
+                    </VBox>
+                </VBox>
+            </HBox>
+
+            <HBox styleClass="status-bar" alignment="CENTER_LEFT">
+                <Label fx:id="statusLabel" text="就绪，请先导入 Excel 数据文件。" />
+            </HBox>
+        </VBox>
     </bottom>
 </BorderPane>
