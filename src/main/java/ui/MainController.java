@@ -994,7 +994,13 @@ public class MainController {
         String configured = System.getenv("PYTHON_EXECUTABLE");
         if (configured != null && !configured.isBlank()) candidates.add(configured);
         candidates.add("python3");
-        candidates.add("/usr/bin/python3");
+        // macOS 上从访达启动的 .app 不继承 shell 的 PATH（只有 /usr/bin:/bin:/usr/sbin:/sbin），
+        // 因此 Homebrew、python.org 安装的解释器必须按绝对路径显式探测，否则只能找到
+        // 系统自带的 /usr/bin/python3——而它默认不含 NumPy/Matplotlib。
+        candidates.add("/opt/homebrew/bin/python3");   // Homebrew（Apple Silicon）
+        candidates.add("/usr/local/bin/python3");      // Homebrew（Intel）/ python.org
+        candidates.add("/Library/Frameworks/Python.framework/Versions/Current/bin/python3");
+        candidates.add("/usr/bin/python3");            // 系统自带（需 pip install --user）
         candidates.add("python");
 
         for (String candidate : candidates) {
